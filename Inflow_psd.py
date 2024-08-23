@@ -25,10 +25,11 @@ source_config=os.path.join(cd,'config.yaml')
 source_log='data/20230101.000500-20240101.224500.awaken.sa1.summary.csv'
 
 #dataset
-channel='awaken/sa1.lidar.z03.c1'
+channel_lid='awaken/sa1.lidar.z03.c1'
+channel_ast='awaken/sb.assist.z01.c0'
 
-sdate='20230501'#start date
-edate='20230508'#end date
+sdate='20230724'#start date
+edate='20230801'#end date
 
 #stats
 WD_range=[100,260]#[deg] wind direction range
@@ -37,9 +38,16 @@ DT=600#[s] resampling period
 max_TKE=10#[m^2/s^2] maximum TKE
 DT_psd=3600*2 #[s] resolution of spectrum
 max_T=102*3600#[s] maximum period
+min_lwp=10#[g/m^2] for liquid water paths lower than this, remove clouds
+max_gamma=5#maximum weight of the prior
+max_rmsr=5#maximum rms of the retrieval
 
 #user-defined
-variables=['WS','WD','TKE']
+variables_lid=['WS','WD','TKE']
+variables_ast=['temperature','waterVapor']
+variables_snc=['Obukhov\'s length']
+height=np.arange(0,2001,100)
+
 skip=10
 
 #%% Initialization
@@ -61,52 +69,75 @@ bin_f=1/np.arange(3600,max_T+1,DT_psd)[::-1]
 f_avg=1/utl.mid(1/bin_f)
 T_avg=utl.mid(np.arange(3600,max_T+1,DT_psd))
 
-PSD=xr.Dataset()
-
 #download data
-_filter = {
-    'Dataset': channel,
-    'date_time': {
-        'between': [sdate,edate]
-    },
-    'file_type':'nc'
-}
-
-utl.mkdir(os.path.join(cd,'data',channel))
 a2e.setup_basic_auth(username=config['username'], password=config['password'])
-a2e.download_with_order(_filter, path=os.path.join(cd,'data',channel),replace=False)
+for channel in [channel_lid,channel_ast]:
+    _filter = {
+        'Dataset': channel,
+        'date_time': {
+            'between': [sdate,edate]
+        },
+        'file_type':['nc','csv']
+    }
+    
+    utl.mkdir(os.path.join(cd,'data',channel))
+    a2e.download_with_order(_filter, path=os.path.join(cd,'data',channel),replace=False)
     
 #load log
 IN=pd.read_csv(os.path.join(cd,source_log)).replace(-9999, np.nan)
 
 #load lidar data
-LID=xr.open_mfdataset(glob.glob(os.path.join(cd,'data',channel,'*nc')))
+LID=xr.open_mfdataset(glob.glob(os.path.join(cd,'data',channel_lid,'*nc')))
+
+#load assist data
+AST=xr.open_mfdataset(glob.glob(os.path.join(cd,'data',channel_ast,'*nc')))
+
+#zeroing
+PSD=xr.Dataset()
 
 #graphics
 utl.mkdir(os.path.join(cd,'figures'))
 
 #%% Main 
 
-#select wind direction range
+#lidar preprocessing
 tnum_in=np.array([utl.datenum(t,'%Y-%m-%d %H:%M:%S') for t in IN['UTC Time']])
 tnum_lid=np.array([utl.dt64_to_num(t) for t in LID.time.values])  
 WD_int=np.interp(tnum_lid,tnum_in,IN['Hub-height wind direction [degrees]'].values)
 LID['WD_hh']=xr.DataArray(data=WD_int,coords={'time':LID.time})
 LID_sel=LID.where(LID['WD_hh']>WD_range[0]).where(LID['WD_hh']<WD_range[-1])
-height=LID_sel.height.values[::skip]
 
-#TKE qc
+#lidar qc
 TKE_qc=LID_sel['TKE'].where(LID_sel['TKE']>0).where(LID_sel['TKE']<max_TKE)
 original_nans=np.isnan(LID_sel['TKE'])
 TKE_int=TKE_qc.chunk({"time": -1}).interpolate_na(dim='time',method='linear')
 TKE_int=TKE_int.where(original_nans==False)
 LID_sel['TKE']=TKE_int
+LID_int=LID_sel.interp(height=height)
 
-for v in variables:
+#assist preprocessing
+tnum_ast=np.array([utl.dt64_to_num(t) for t in AST.time.values])  
+WD_int=np.interp(tnum_ast,tnum_in,IN['Hub-height wind direction [degrees]'].values)
+AST['WD_hh']=xr.DataArray(data=WD_int,coords={'time':AST.time})
+AST_sel=AST.where(AST['WD_hh']>WD_range[0]).where(AST['WD_hh']<WD_range[-1])
+AST_sel['height']=AST_sel.height*1000
+AST_sel['cbh']=AST_sel.cbh*1000
+
+#assist qc
+AST_sel['cbh'][AST_sel['lwp']<min_lwp]=10000
+AST_sel=AST_sel.where(AST_sel['height']<AST_sel['cbh']).where(AST_sel['rmsr']<max_rmsr).where(AST_sel['gamma']<max_gamma)
+AST_int=AST_sel.interp(height=height).interp(time=LID_int.time)
+
+for v in variables_lid+variables_ast:
     psd_T=[]
     for h in height:
         print(h)
-        f_sel=LID_sel[v].sel(height=h)
+        
+        if v in variables_lid:
+            f_sel=LID_int[v].sel(height=h)
+        elif v in variables_ast:
+                f_sel=AST_int[v].sel(height=h)
+                
         if np.sum(~np.isnan(f_sel))>min_points_psd:
             
             #find real values
