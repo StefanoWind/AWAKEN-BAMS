@@ -27,7 +27,7 @@ source_log='data/20230101.000500-20240101.224500.awaken.sa1.summary.csv'
 source_lidar='data/awaken/sa1.lidar.z03.c1/*nc'
 
 #stats
-WD_range=[100,260]#[deg] wind direction range
+WD_range=[0,360]#[deg] wind direction range
 bin_hour=np.arange(25)
 perc_lim=[5,95]
 p_value=0.95
@@ -111,18 +111,19 @@ for v in variables:
        
     LID_avg[v]=xr.DataArray(data=f_avg_all.T,coords={'hour':hour_avg,'height':LID_sel.height.values})
     
-LID_avg['U']=LID['WS']*utl.cosd(270-LID['WD'])
-LID_avg['V']=LID['WS']*utl.sind(270-LID['WD'])
+LID_avg['U']=LID_avg['WS']*utl.cosd(270-LID_avg['WD'])
+LID_avg['V']=LID_avg['WS']*utl.sind(270-LID_avg['WD'])
 
 #%% Plots
+plt.close('all')
 fig=plt.figure(figsize=(18,10))
 ax=plt.subplot(2,1,1)
-CS = ax.contourf(hour_avg, height, LID_avg['WS'].T, np.arange(3, 12,0.5), extend='both', cmap='viridis')
-ax.barbs(hour_avg, height[::barb_stagger_height], LID_avg['U'][::barb_stagger_height,:]*1.94, LID_avg['V'][::barb_stagger_height,:]*1.94,
+CS = ax.contourf(hour_avg, height, LID_avg['WS'].T, np.arange(5, 13,0.5), extend='both', cmap='viridis')
+ax.barbs(hour_avg, height[::barb_stagger_height], LID_avg['U'].T[::barb_stagger_height,:]*1.94, LID_avg['V'].T[::barb_stagger_height,:]*1.94,
 barbcolor='k', flagcolor='k', color='k', fill_empty=0, length=5.8, linewidth=1)
-ax.barbs(hour_avg[0]+np.timedelta64(1260,'s'), 2600, 10*np.cos(60), -10*np.sin(60), barbcolor='k',
+ax.barbs(-2, 2600, 10*np.cos(60), -10*np.sin(60), barbcolor='k',
 flagcolor='k', color='k', fill_empty=0, length=5.8, linewidth=1.4)
-ax.text(hour_avg[0]+np.timedelta64(600,'s'), 2480, '10 kts \n', fontsize=12, bbox=dict(facecolor='none', edgecolor='black', alpha=0.8))
+ax.text(-2, 2480, '10 kts \n', fontsize=12, bbox=dict(facecolor='w', edgecolor='black', alpha=0.25))
 
 divider = make_axes_locatable(ax)
 cax = divider.append_axes('right', size = '2%', pad=0.65)
@@ -130,22 +131,25 @@ cb = fig.colorbar(CS, cax=cax, orientation='vertical')
 cb.set_label(r'Mean horizontal wind speed [m s$^{-1}$]')
 
 ax.set_ylabel(r'z [m $AGL$]')
+ax.set_xlim([0,24])
 ax.set_ylim(0, 3000)
 ax.grid()
 ax.tick_params(axis='both', which='major')
 ax.xaxis.set_major_formatter(mdates.DateFormatter('%H-%M'))
 
 ax=plt.subplot(2,1,2)
-CS = ax.contourf(hour_avg, height, np.log10(LID_avg['TKE'].T), np.arange(-2,0.71,0.1),extend='both', cmap='inferno')
-ax.barbs(hour_avg, height[::barb_stagger_height], LID_avg['U'][::barb_stagger_height,:]*1.94, LID_avg['V'][::barb_stagger_height,:]*1.94,
-barbcolor='k', flagcolor='k', color='k', fill_empty=0, length=5.8, linewidth=1)
+CS = ax.contourf(hour_avg, height, np.log10(LID_avg['TKE'].T), np.arange(-1,0.71,0.1), extend='both', cmap='inferno')
 
+divider = make_axes_locatable(ax)
+cax = divider.append_axes('right', size = '2%', pad=0.65)
+cb = fig.colorbar(CS, cax=cax, orientation='vertical')
 cb.set_label(r'Turbulent kinetic energy [m$^2$ s$^{-2}$]')
-cb.set_ticks([-2,-1,0,np.log10(5)])
-cb.set_ticklabels(['0.01','0.1','1','5'])
+cb.set_ticks(np.log10(np.array([0.1,0.2,0.5,1,2.5,5])))
+cb.set_ticklabels(['0.1','0.2','0.5','1','2','5'])
 
 ax.set_xlabel('Time (UTC)')
 ax.set_ylabel(r'z [m $AGL$]')
+ax.set_xlim([0,24])
 ax.set_ylim(0, 3000)
 ax.grid()
 ax.tick_params(axis='both', which='major')
