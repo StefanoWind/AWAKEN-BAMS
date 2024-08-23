@@ -24,8 +24,8 @@ matplotlib.rcParams['font.size'] = 18
 
 
 #%% Inputs
-source=os.path.join(cd,'data/100-260.psd.nc')
-bin_h=np.array([0,150,300,500,1000,2000])
+source=os.path.join(cd,'data/100-260.psd.full.nc')
+bin_h=np.array([100,150,300,500,1000,2000])
 
 #%% Initialization
 Data=xr.open_dataset(source)
@@ -39,6 +39,8 @@ Data_avg = Data_avg.interpolate_na(dim="period", method="linear")
 
 #%% Plots
 plt.close('all')
+
+#line plot
 ctr=1
 plt.figure(figsize=(18,6))
 for v in Data.var():
@@ -61,5 +63,17 @@ for v in Data.var():
         
 plt.legend(draggable=True)
 
-
-
+#heatmap
+ctr=1
+plt.figure(figsize=(18,6))
+for v in Data.var():
+    ax=plt.subplot(1,len(Data.var()),ctr)
+    plt.contourf(Data.period/3600,Data.height,np.log10(Data[v].T),np.arange(-9,-4,0.1),cmap='viridis',extent='both')
+    plt.xlabel('Period [hours]')
+    plt.ylabel(r'$z$ [m AGL]')
+    plt.xlim([2,48])
+    plt.ylim([0,2000])
+    ax.set_xscale('log')
+    plt.title(v)
+    plt.grid()
+    ctr+=1
