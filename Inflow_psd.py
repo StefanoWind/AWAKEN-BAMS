@@ -34,7 +34,7 @@ edate='20230508'#end date
 WD_range=[100,260]#[deg] wind direction range
 min_points_psd=144*2*2/3# minimum contiguous time series length
 DT=600#[s] resampling period
-max_TKE=5#[m^2/s^2] maximum TKE
+max_TKE=10#[m^2/s^2] maximum TKE
 DT_psd=3600*2 #[s] resolution of spectrum
 max_T=102*3600#[s] maximum period
 
@@ -72,16 +72,18 @@ _filter = {
     'file_type':'nc'
 }
 
-# a2e.setup_basic_auth(username=config['username'], password=config['password'])
-
-# utl.mkdir(os.path.join(cd,'data',channel))
-# a2e.download_with_order(_filter, path=os.path.join(cd,'data',channel),replace=False)
+utl.mkdir(os.path.join(cd,'data',channel))
+a2e.setup_basic_auth(username=config['username'], password=config['password'])
+a2e.download_with_order(_filter, path=os.path.join(cd,'data',channel),replace=False)
     
 #load log
 IN=pd.read_csv(os.path.join(cd,source_log)).replace(-9999, np.nan)
 
-#%lidar data
+#load lidar data
 LID=xr.open_mfdataset(glob.glob(os.path.join(cd,'data',channel,'*nc')))
+
+#graphics
+utl.mkdir(os.path.join(cd,'figures'))
 
 #%% Main 
 
@@ -92,6 +94,13 @@ WD_int=np.interp(tnum_lid,tnum_in,IN['Hub-height wind direction [degrees]'].valu
 LID['WD_hh']=xr.DataArray(data=WD_int,coords={'time':LID.time})
 LID_sel=LID.where(LID['WD_hh']>WD_range[0]).where(LID['WD_hh']<WD_range[-1])
 height=LID_sel.height.values[::skip]
+
+#TKE qc
+TKE_qc=LID_sel['TKE'].where(LID_sel['TKE']>0).where(LID_sel['TKE']<max_TKE)
+original_nans=np.isnan(LID_sel['TKE'])
+TKE_int=TKE_qc.chunk({"time": -1}).interpolate_na(dim='time',method='linear')
+TKE_int=TKE_int.where(original_nans==False)
+LID_sel['TKE']=TKE_int
 
 for v in variables:
     psd_T=[]
@@ -146,7 +155,7 @@ for v in variables:
     plt.colorbar(label='Normalized PSD [$h^{-1}$]')
     plt.grid()
     
-    plt.savefig(os.path.join(cd,f'data/{WD_range[0]}-{WD_range[1]}.psd.{v}.png'))
+    plt.savefig(os.path.join(cd,f'figures/{WD_range[0]}-{WD_range[1]}.psd.{v}.png'))
     plt.close()
     
 #%% Output
