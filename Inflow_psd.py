@@ -145,7 +145,7 @@ AST_int=AST_sel.interp(height=height).interp(time=LID_int.time)
 for v in variables_lid+variables_ast:
     psd_T=[]
     for h in height:
-        print(v+': z = '+h+' m')
+        print(v+': z = '+str(h)+' m')
         
         if v in variables_lid:
             f_sel=LID_int[v].sel(height=h)
