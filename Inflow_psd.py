@@ -32,7 +32,7 @@ sdate='20230724'#start date
 edate='20230801'#end date
 
 #stats
-WD_range=[100,260]#[deg] wind direction range
+WD_range=[90,270]#[deg] wind direction range
 min_points_psd=144*2*2/3# minimum contiguous time series length
 DT=600#[s] resampling period
 max_TKE=10#[m^2/s^2] maximum TKE
@@ -47,8 +47,6 @@ variables_lid=['WS','WD','TKE']
 variables_ast=['temperature','waterVapor']
 variables_snc=['Obukhov\'s length']
 height=np.arange(0,2001,100)
-
-skip=10
 
 #%% Initialization
 
@@ -101,11 +99,18 @@ utl.mkdir(os.path.join(cd,'figures'))
 #%% Main 
 
 #lidar preprocessing
+
+#select wind sector
 tnum_in=np.array([utl.datenum(t,'%Y-%m-%d %H:%M:%S') for t in IN['UTC Time']])
 tnum_lid=np.array([utl.dt64_to_num(t) for t in LID.time.values])  
-WD_int=np.interp(tnum_lid,tnum_in,IN['Hub-height wind direction [degrees]'].values)
+WD_c=np.interp(tnum_lid,tnum_in,utl.cosd(IN['Hub-height wind direction [degrees]'].values))
+WD_s=np.interp(tnum_lid,tnum_in,utl.sind(IN['Hub-height wind direction [degrees]'].values))
+WD_int=utl.cart2pol(WD_c,WD_s)[1]%360
 LID['WD_hh']=xr.DataArray(data=WD_int,coords={'time':LID.time})
-LID_sel=LID.where(LID['WD_hh']>WD_range[0]).where(LID['WD_hh']<WD_range[-1])
+if WD_range[1]>WD_range[0]:
+    LID_sel=LID.where(LID['WD_hh']>WD_range[0]).where(LID['WD_hh']<WD_range[1])
+else:
+    LID_sel=LID.where((LID['WD_hh']<WD_range[1]) | (LID['WD_hh']>WD_range[0]))
 
 #lidar qc
 TKE_qc=LID_sel['TKE'].where(LID_sel['TKE']>0).where(LID_sel['TKE']<max_TKE)
@@ -116,10 +121,19 @@ LID_sel['TKE']=TKE_int
 LID_int=LID_sel.interp(height=height)
 
 #assist preprocessing
+
+#select wind sector
 tnum_ast=np.array([utl.dt64_to_num(t) for t in AST.time.values])  
-WD_int=np.interp(tnum_ast,tnum_in,IN['Hub-height wind direction [degrees]'].values)
+WD_c=np.interp(tnum_ast,tnum_in,utl.cosd(IN['Hub-height wind direction [degrees]'].values))
+WD_s=np.interp(tnum_ast,tnum_in,utl.sind(IN['Hub-height wind direction [degrees]'].values))
+WD_int=utl.cart2pol(WD_c,WD_s)[1]%360
 AST['WD_hh']=xr.DataArray(data=WD_int,coords={'time':AST.time})
-AST_sel=AST.where(AST['WD_hh']>WD_range[0]).where(AST['WD_hh']<WD_range[-1])
+if WD_range[1]>WD_range[0]:
+    AST_sel=AST.where(AST['WD_hh']>WD_range[0]).where(AST['WD_hh']<WD_range[1])
+else:
+    AST_sel=AST.where((AST['WD_hh']<WD_range[1]) | (AST['WD_hh']>WD_range[0]))
+
+#fix units
 AST_sel['height']=AST_sel.height*1000
 AST_sel['cbh']=AST_sel.cbh*1000
 
@@ -131,7 +145,7 @@ AST_int=AST_sel.interp(height=height).interp(time=LID_int.time)
 for v in variables_lid+variables_ast:
     psd_T=[]
     for h in height:
-        print(h)
+        print(v+': z = '+h+' m')
         
         if v in variables_lid:
             f_sel=LID_int[v].sel(height=h)
@@ -181,11 +195,11 @@ for v in variables_lid+variables_ast:
     PSD[v]=xr.DataArray(data=psd_T.T,coords={'period':T_avg,'height':height},attrs={'description':'Normalized power spectral density','units':'s^-1'})
     plt.figure()
     plt.pcolor(T_avg/3600,height,np.log10(PSD[v].T))
-    plt.xlabel(r'Period [h]')
+    plt.xlabel(r'Period [hour]')
     plt.ylabel(r'$z$ [m AGL]')
-    plt.colorbar(label='Normalized PSD [$h^{-1}$]')
+    plt.colorbar(label='Normalized PSD [$hour^{-1}$]')
     plt.grid()
-    
+    plt.tight_layout()
     plt.savefig(os.path.join(cd,f'figures/{WD_range[0]}-{WD_range[1]}.psd.{v}.png'))
     plt.close()
     
