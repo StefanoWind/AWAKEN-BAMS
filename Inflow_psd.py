@@ -33,7 +33,7 @@ edate='20230801'#end date
 
 #stats
 WD_range=[90,270]#[deg] wind direction range
-min_points_psd=144*2*2/3# minimum contiguous time series length
+min_points_psd=144# minimum contiguous time series length
 DT=600#[s] resampling period
 max_TKE=10#[m^2/s^2] maximum TKE
 DT_psd=3600*2 #[s] resolution of spectrum
