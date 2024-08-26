@@ -44,9 +44,8 @@ max_rmsr=5#maximum rms of the retrieval
 
 #user-defined
 variables_lid=['WS','WD','TKE']
-variables_ast=['temperature','waterVapor']
-variables_snc=['Obukhov\'s length']
-height=np.arange(0,2001,100)
+variables_ast=['temperature','rh']
+height=np.arange(0,2001,25)
 
 #%% Initialization
 
