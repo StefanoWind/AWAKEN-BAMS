@@ -77,17 +77,17 @@ for channel in [channel_lid,channel_ast]:
         'file_type':['nc','csv']
     }
     
-    utl.mkdir(os.path.join(cd,'data',channel))
-    a2e.download_with_order(_filter, path=os.path.join(cd,'data',channel),replace=False)
+    utl.mkdir(os.path.join(config['path_data'],channel))
+    a2e.download_with_order(_filter, path=os.path.join(config['path_data'],channel),replace=False)
     
 #load log
 IN=pd.read_csv(os.path.join(cd,source_log)).replace(-9999, np.nan)
 
 #load lidar data
-LID=xr.open_mfdataset(glob.glob(os.path.join(cd,'data',channel_lid,'*nc')))
+LID=xr.open_mfdataset(glob.glob(os.path.join(config['path_data'],channel_lid,'*nc')))
 
 #load assist data
-AST=xr.open_mfdataset(glob.glob(os.path.join(cd,'data',channel_ast,'*nc')))
+AST=xr.open_mfdataset(glob.glob(os.path.join(config['path_data'],channel_ast,'*nc')))
 
 #zeroing
 PSD=xr.Dataset()

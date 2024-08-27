@@ -60,20 +60,17 @@ for channel in [channel_met,channel_snc]:
         'file_type':['nc','csv']
     }
     
-    utl.mkdir(os.path.join(cd,'data',channel))
-    a2e.download_with_order(_filter, path=os.path.join(cd,'data',channel),replace=False)
-    
-utl.mkdir(os.path.join(cd,'data',channel_met))
-a2e.download_with_order(_filter, path=os.path.join(cd,'data',channel_met),replace=False)
+    utl.mkdir(os.path.join(config['path_data'],channel))
+    a2e.download_with_order(_filter, path=os.path.join(config['path_data'],channel),replace=False)
     
 #load log
 IN=pd.read_csv(os.path.join(cd,source_log)).replace(-9999, np.nan)
 
 #load met data
-MET=xr.open_mfdataset(glob.glob(os.path.join(cd,'data',channel_met,'*nc')))
+MET=xr.open_mfdataset(glob.glob(os.path.join(config['path_data'],channel_met,'*nc')))
 
 #load sonic data
-files_snc=glob.glob(os.path.join(cd,'data',channel_snc,'*csv'))
+files_snc=glob.glob(os.path.join(config['path_data'],channel_snc,'*csv'))
 dfs=[]
 for f in files_snc:
     df = pd.read_csv(f).iloc[1:,:]

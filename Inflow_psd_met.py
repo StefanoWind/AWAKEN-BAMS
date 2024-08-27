@@ -73,20 +73,17 @@ for channel in [channel_met,channel_snc]:
         'file_type':['nc','csv']
     }
     
-    utl.mkdir(os.path.join(cd,'data',channel))
-    a2e.download_with_order(_filter, path=os.path.join(cd,'data',channel),replace=False)
-    
-utl.mkdir(os.path.join(cd,'data',channel_met))
-a2e.download_with_order(_filter, path=os.path.join(cd,'data',channel_met),replace=False)
+    utl.mkdir(os.path.join(config['path_data'],channel))
+    a2e.download_with_order(_filter, path=os.path.join(config['path_data'],channel),replace=False)
     
 #load log
 IN=pd.read_csv(os.path.join(cd,source_log)).replace(-9999, np.nan)
 
 #load met data
-MET=xr.open_mfdataset(glob.glob(os.path.join(cd,'data',channel_met,'*nc')))
+MET=xr.open_mfdataset(glob.glob(os.path.join(config['path_data'],channel_met,'*nc')))
 
 #load sonic data
-files_snc=glob.glob(os.path.join(cd,'data',channel_snc,'*csv'))
+files_snc=glob.glob(os.path.join(config['path_data'],channel_snc,'*csv'))
 dfs=[]
 for f in files_snc:
     df = pd.read_csv(f).iloc[1:,:]
@@ -102,6 +99,9 @@ utl.mkdir(os.path.join(cd,'figures'))
 #%% Main 
 
 #met preprocessing
+MET['time_bin'] = pd.cut(MET['time'], bins=np.arange(MET.time.values[0],MET.time.values[-1]+np.timedelta64(10, 'm')/2,np.timedelta64(10, 'm')))
+MET_10m=MET.groupby('time_bin').mean().reset_index()
+
 
 #select wind sector
 tnum_in=np.array([utl.datenum(t,'%Y-%m-%d %H:%M:%S') for t in IN['UTC Time']])
@@ -147,7 +147,7 @@ else:
 SNC_sel=SNC_sel.where(SNC_sel['QC flag']==0)
 
 #psd
-variables=variables_met+variables_snc
+variables=variables_snc+variables_met
 for v in variables:
     print(v)
 
@@ -174,7 +174,7 @@ for v in variables:
             
                 #resampling
                 f=f_sel[r1:r2]
-                tnum= [utl.dt64_to_num(t) for t in f.time]
+                tnum= np.array([utl.dt64_to_num(t) for t in f.time])
                 tnum_res=np.arange(np.min(tnum),np.max(tnum)+1,DT)
                 f_res=np.interp(tnum_res,tnum,f.values)
                 f_psd, psd = signal.periodogram(f_res, fs=1/DT,  scaling='density')
@@ -184,7 +184,7 @@ for v in variables:
                 psd_all=np.append(psd_all,psd/np.var(f_res))
             
         if len(psd_all)>0:   
-        
+            raise BaseException()
             #average frequency spectrum
             psd_avg=stats.binned_statistic(f_psd_all,psd_all,statistic='mean',bins=bin_f)[0]
         
