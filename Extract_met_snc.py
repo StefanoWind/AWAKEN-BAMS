@@ -24,15 +24,11 @@ source_config=os.path.join(cd,'config.yaml')
 source_log='data/20230101.000500-20240101.224500.awaken.sa1.summary.csv'
 
 #dataset
-channel_met='awaken/sa1.met.z01.b0'
+source_met='awaken/sa1.met.z01.b0'
 channel_snc='awaken/sa1.sonic.z01.c0'
 
 sdate='20230724'#start date
 edate='20230801'#end date
-
-#user-defined
-variables_met=['average_wind_speed','wind_direction','temperature','relative_humidity']
-variables_snc=['TKE']
 
 #%% Initialization
 
@@ -49,25 +45,25 @@ from doe_dap_dl import DAP
 a2e = DAP('a2e.energy.gov',confirm_downloads=False)
 
 
-#download data
+#download sonic data
 a2e.setup_basic_auth(username=config['username'], password=config['password'])
-for channel in [channel_met,channel_snc]:
-    _filter = {
-        'Dataset': channel,
-        'date_time': {
-            'between': [sdate,edate]
-        },
-        'file_type':['nc','csv']
-    }
-    
-    utl.mkdir(os.path.join(config['path_data'],channel))
-    a2e.download_with_order(_filter, path=os.path.join(config['path_data'],channel),replace=False)
+
+_filter = {
+    'Dataset': channel_snc,
+    'date_time': {
+        'between': [sdate,edate]
+    },
+    'file_type':'csv'
+}
+
+utl.mkdir(os.path.join(config['path_data'],channel_snc))
+a2e.download_with_order(_filter, path=os.path.join(config['path_data'],channel_snc),replace=False)
     
 #load log
 IN=pd.read_csv(os.path.join(cd,source_log)).replace(-9999, np.nan)
 
 #load met data
-MET=xr.open_mfdataset(glob.glob(os.path.join(config['path_data'],channel_met,'*nc')))
+MET=xr.open_mfdataset(glob.glob(os.path.join(config['path_data'],source_met,'*nc')))
 
 #load sonic data
 files_snc=glob.glob(os.path.join(config['path_data'],channel_snc,'*csv'))
@@ -80,20 +76,7 @@ SNC_df = pd.concat(dfs, ignore_index=True)
 #zeroing
 PSD=xr.Dataset()
 
-#graphics
-utl.mkdir(os.path.join(cd,'figures'))
-
 #%% Main 
-
-#met preprocessing
-
-#select wind sector
-tnum_in=np.array([utl.datenum(t,'%Y-%m-%d %H:%M:%S') for t in IN['UTC Time']])
-tnum_met=np.array([utl.dt64_to_num(t) for t in MET.time.values])  
-WD_c=np.interp(tnum_met,tnum_in,utl.cosd(IN['Hub-height wind direction [degrees]'].values))
-WD_s=np.interp(tnum_met,tnum_in,utl.sind(IN['Hub-height wind direction [degrees]'].values))
-WD_int=utl.cart2pol(WD_c,WD_s)[1]%360
-MET['WD_hh']=xr.DataArray(data=WD_int,coords={'time':MET.time})
 
 #sonic preprocessoning
 y=SNC_df['year'].values
@@ -110,11 +93,6 @@ SNC_df['time']=time_snc
 SNC_df=SNC_df.set_index('time').apply(pd.to_numeric)
 SNC=xr.Dataset.from_dataframe(SNC_df.apply(pd.to_numeric))
 tnum_snc=np.array([utl.dt64_to_num(t) for t in SNC.time.values])  
-WD_c=np.interp(tnum_snc,tnum_in,utl.cosd(IN['Hub-height wind direction [degrees]'].values))
-WD_s=np.interp(tnum_snc,tnum_in,utl.sind(IN['Hub-height wind direction [degrees]'].values))
-WD_int=utl.cart2pol(WD_c,WD_s)[1]%360
-SNC['WD_hh']=xr.DataArray(data=WD_int,coords={'time':SNC.time})
-
 
 #%% Output
 MET.to_netcdf(os.path.join(cd,'data/met.nc'))
