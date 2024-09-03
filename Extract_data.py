@@ -25,7 +25,7 @@ source_config=os.path.join(cd,'config.yaml')
 #dataset
 channel_lid='awaken/sa1.lidar.z03.c1'
 channel_ast='awaken/sb.assist.z01.c0'
-source_met='awaken/sa2.met.z01.b0'
+source_met='awaken/sa2.met.z01.c0'
 channel_snc='awaken/sa2.sonic.z01.c0'
 
 sdate='20230724'#start date
