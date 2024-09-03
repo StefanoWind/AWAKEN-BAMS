@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Extract met and sonic variables
+Extract lidar, ASSIST, met and sonic variables
 """
 import os
 cd=os.path.dirname(__file__)
@@ -21,14 +21,18 @@ matplotlib.rcParams['font.size'] = 18
 
 #%% Inputs
 source_config=os.path.join(cd,'config.yaml')
-source_log='data/20230101.000500-20240101.224500.awaken.sa1.summary.csv'
 
 #dataset
-source_met='awaken/sa1.met.z01.b0'
-channel_snc='awaken/sa1.sonic.z01.c0'
+channel_lid='awaken/sa1.lidar.z03.c1'
+channel_ast='awaken/sb.assist.z01.c0'
+source_met='awaken/sa2.met.z01.b0'
+channel_snc='awaken/sa2.sonic.z01.c0'
 
 sdate='20230724'#start date
 edate='20230801'#end date
+
+#user defined
+height=np.array([0,110.001,200,500,1000,2000])#[m] height for remote sesing data extraction
 
 #%% Initialization
 
@@ -44,23 +48,25 @@ from doe_dap_dl import DAP
 
 a2e = DAP('a2e.energy.gov',confirm_downloads=False)
 
-
 #download sonic data
 a2e.setup_basic_auth(username=config['username'], password=config['password'])
-
-_filter = {
-    'Dataset': channel_snc,
-    'date_time': {
-        'between': [sdate,edate]
-    },
-    'file_type':'csv'
-}
-
-utl.mkdir(os.path.join(config['path_data'],channel_snc))
-a2e.download_with_order(_filter, path=os.path.join(config['path_data'],channel_snc),replace=False)
+for channel in [channel_lid,channel_ast,channel_snc]:
+    _filter = {
+        'Dataset': channel,
+        'date_time': {
+            'between': [sdate,edate]
+        },
+        'file_type':['nc','csv']
+    }
     
-#load log
-IN=pd.read_csv(os.path.join(cd,source_log)).replace(-9999, np.nan)
+    utl.mkdir(os.path.join(config['path_data'],channel))
+    a2e.download_with_order(_filter, path=os.path.join(config['path_data'],channel),replace=False)
+
+#load lidar data
+LID=xr.open_mfdataset(glob.glob(os.path.join(config['path_data'],channel_lid,'*nc')))
+
+#load assist data
+AST=xr.open_mfdataset(glob.glob(os.path.join(config['path_data'],channel_ast,'*nc')))
 
 #load met data
 MET=xr.open_mfdataset(glob.glob(os.path.join(config['path_data'],source_met,'*nc')))
@@ -92,8 +98,13 @@ for i in range(len(y)):
 SNC_df['time']=time_snc
 SNC_df=SNC_df.set_index('time').apply(pd.to_numeric)
 SNC=xr.Dataset.from_dataframe(SNC_df.apply(pd.to_numeric))
-tnum_snc=np.array([utl.dt64_to_num(t) for t in SNC.time.values])  
+
+#interpolation
+LID_int=LID.interp(height=height)
+AST_int=AST.interp(height=height/1000)
 
 #%% Output
-MET.to_netcdf(os.path.join(cd,'data/met.nc'))
-SNC.to_netcdf(os.path.join(cd,'data/snc.nc'))
+LID_int.to_netcdf(os.path.join(cd,'data/'+channel_lid.split('/')[1]+'.'+sdate+'.'+edate+'.nc'))
+AST_int.to_netcdf(os.path.join(cd,'data/'+channel_ast.split('/')[1]+'.'+sdate+'.'+edate+'.nc'))
+MET.to_netcdf(os.path.join(cd,'data/'+source_met.split('/')[1]+'.'+sdate+'.'+edate+'.nc'))
+SNC.to_netcdf(os.path.join(cd,'data/'+channel_snc.split('/')[1]+'.'+sdate+'.'+edate+'.nc'))

@@ -21,7 +21,7 @@ matplotlib.rcParams['font.size'] = 18
 source_config=os.path.join(cd,'config.yaml')
 
 #dataset
-channel='awaken/sa1.met.z01.b0'
+channel='awaken/sa2.met.z01.b0'
 sdate='20230724'#start date
 edate='20230801'#end date
 min_files=np.floor(24*0.8)
