@@ -62,12 +62,16 @@ dates=[utl.datestr(t,'%Y%m%d') for t in np.arange(utl.datenum(sdate,'%Y%m%d'),ut
 for d in dates:
     files=glob.glob(os.path.join(config['path_data'],channel,'*'+d+'*nc'))
     if len(files)>min_files:
-        Data=xr.open_mfdataset(files)
-        bin_time=np.arange(Data.time.values[0],Data.time.values[-1]+np.timedelta64(10, 'm')/2,np.timedelta64(10, 'm'))
-        Data_10m=Data.groupby_bins("time", bin_time).mean()
-        Data_10m['time_bins']=np.arange(Data.time.values[0]+np.timedelta64(10, 'm')/2,Data.time.values[-1],np.timedelta64(10, 'm'))
-        Data_10m=Data_10m.rename({"time_bins": "time"})
-        Data_10m.to_netcdf(os.path.join(config['path_data'],channel.replace('b0','c0'),channel.replace('awaken/','').replace('b0','c0')+'.'+d+'.000000.nc'))
-        print(d+' done')
+        try:
+            Data=xr.open_mfdataset(files)
+            bin_time=np.arange(Data.time.values[0],Data.time.values[-1]+np.timedelta64(10, 'm')/2,np.timedelta64(10, 'm'))
+            Data_10m=Data.groupby_bins("time", bin_time).mean()
+            Data_10m['time_bins']=np.arange(Data.time.values[0]+np.timedelta64(10, 'm')/2,Data.time.values[-1],np.timedelta64(10, 'm'))
+            Data_10m=Data_10m.rename({"time_bins": "time"})
+            Data_10m.to_netcdf(os.path.join(config['path_data'],channel.replace('b0','c0'),channel.replace('awaken/','').replace('b0','c0')+'.'+d+'.000000.nc'))
+            print(d+' done')
+        except Exception as e:
+            print('Error on '+d)
+            print(e)
     else:
         print('Not enough files on '+d)
