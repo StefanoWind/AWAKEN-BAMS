@@ -23,7 +23,10 @@ matplotlib.rcParams['font.size'] = 18
 source_config=os.path.join(cd,'config.yaml')
 
 #dataset
-channel_lid='awaken/sa1.lidar.z03.c1'
+channels_lid=['awaken/sa1.lidar.z03.c1',
+              'awaken/sa2.lidar.z01.c1',
+              'awaken/sh.lidar.z02.c1']
+              
 channel_ast='awaken/sb.assist.z01.c0'
 source_met='awaken/sa2.met.z01.c0'
 channel_snc='awaken/sa2.sonic.z01.c0'
@@ -50,7 +53,7 @@ a2e = DAP('a2e.energy.gov',confirm_downloads=False)
 
 #download sonic data
 a2e.setup_basic_auth(username=config['username'], password=config['password'])
-for channel in [channel_lid,channel_ast,channel_snc]:
+for channel in channels_lid+[channel_ast]+[channel_snc]:
     _filter = {
         'Dataset': channel,
         'date_time': {
@@ -63,7 +66,9 @@ for channel in [channel_lid,channel_ast,channel_snc]:
     a2e.download_with_order(_filter, path=os.path.join(config['path_data'],channel),replace=False)
 
 #load lidar data
-LID=xr.open_mfdataset(glob.glob(os.path.join(config['path_data'],channel_lid,'*nc')))
+LID={}
+for channel_lid in channels_lid:
+    LID[channel_lid]=xr.open_mfdataset(glob.glob(os.path.join(config['path_data'],channel_lid,'*nc')))
 
 #load assist data
 AST=xr.open_mfdataset(glob.glob(os.path.join(config['path_data'],channel_ast,'*nc')))
@@ -100,11 +105,15 @@ SNC_df=SNC_df.set_index('time').apply(pd.to_numeric)
 SNC=xr.Dataset.from_dataframe(SNC_df.apply(pd.to_numeric))
 
 #interpolation
-LID_int=LID.interp(height=height)
+LID_int={}
+for channel_lid in channels_lid:
+    LID_int[channel_lid]=LID[channel_lid].interp(height=height)
 AST_int=AST.interp(height=height/1000)
 
 #%% Output
-LID_int.to_netcdf(os.path.join(cd,'data/'+channel_lid.split('/')[1]+'.'+sdate+'.'+edate+'.nc'))
-AST_int.to_netcdf(os.path.join(cd,'data/'+channel_ast.split('/')[1]+'.'+sdate+'.'+edate+'.nc'))
+
+for channel_lid in channels_lid:
+    LID_int[channel_lid].to_netcdf(os.path.join(cd,'data/'+channel_lid.split('/')[1]+'.'+sdate+'.'+edate+'.'+str(len(height))+'_levels.nc'))
+AST_int.to_netcdf(os.path.join(cd,'data/'+channel_ast.split('/')[1]+'.'+sdate+'.'+edate+'.'+str(len(height))+'_levels.nc'))
 MET.to_netcdf(os.path.join(cd,'data/'+source_met.split('/')[1]+'.'+sdate+'.'+edate+'.nc'))
 SNC.to_netcdf(os.path.join(cd,'data/'+channel_snc.split('/')[1]+'.'+sdate+'.'+edate+'.nc'))
