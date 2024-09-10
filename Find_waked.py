@@ -17,7 +17,7 @@ source_lyt=os.path.join(cd, 'data/20231026_AWAKEN_layout.nc')
 WD=np.arange(0,360,1)#[deg] set of wind directions
 
 #graphics
-site_plot='A1'
+site_plot='A1d'
 
 #%% Initialization
 TRB=xr.open_dataset(source_lyt,group='Turbines')
@@ -50,7 +50,7 @@ for s in SIT['Site name'].values:
         if np.sum(waking)>0:
             waked[i_s,i_wd]=np.nanmin(L[waking]/D[waking])
         else:
-            waked[i_s,i_wd]=-9999
+            waked[i_s,i_wd]=9999
         
         if s==site_plot:
             plt.figure()
@@ -77,7 +77,7 @@ for s in SIT['Site name'].values:
             utl.mkdir(os.path.join(cd,'figures',s))
             plt.savefig(os.path.join(cd,'figures/',s,'{:03d}'.format(wd)+'deg.png'))
             plt.close()
-        
+        print(s+': '+str(wd))
         i_wd+=1
     i_s+=1
 
@@ -86,7 +86,7 @@ Output = xr.Dataset({
 'waked': xr.DataArray(
             data   = waked,   # enter data here
             dims   = ['site','wind_direction'],
-            coords = {'site': SIT['Site_name'].values,'wind_direction':WD},
+            coords = {'site': SIT['Site name'].values,'wind_direction':WD},
             attrs  = {'_FillValue': -9999,'description':'Distance of the closest waking turbine'})})
 
 Output.to_netcdf('data/'+datetime.strftime(datetime.now(),'%Y%m%d')+'_AWAKEN_waked.nc')
