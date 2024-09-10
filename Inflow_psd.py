@@ -5,7 +5,8 @@ Calculated psd of inflow variables
 import os
 cd=os.path.dirname(__file__)
 import sys
-
+sys.path.append('C:/Users/SLETIZIA/OneDrive - NREL/Desktop/PostDoc/utils')
+import utils as utl
 import numpy as np
 import yaml
 import xarray as xr
@@ -21,18 +22,24 @@ matplotlib.rcParams['font.size'] = 18
 source_config=os.path.join(cd,'config.yaml')
 
 #dataset
-# source_met='awaken/sa1.met.z01.c0/*nc'
-source_lid=os.path.join(cd,'data/sa1.lidar.z03.c1.20230101.20240101.nc')
-source_ast=os.path.join(cd,'data/sb.assist.z01.c0.20230101.20240101.nc')
-source_met=os.path.join(cd,'data/sa2.met.z01.c0.20230101.20240101.nc')
-source_snc=os.path.join(cd,'data/sa2.sonic.z01.c0.20230101.20240101.nc')
+source_lid=os.path.join(cd,'data/sa1.lidar.z03.c1.20230101.20240101.6_levels.nc')
+source_ast=os.path.join(cd,'data/6 heights/sb.assist.z01.c0.20230101.6_levels.20240101.nc')
+source_met=os.path.join(cd,'data/6 heights/sa2.met.z01.c0.20230101.6_levels.20240101.nc')
+source_snc=os.path.join(cd,'data/6 heights/sa2.sonic.z01.c0.20230101.6_levels.20240101.nc')
 
 #user-defined
 variables_lid=['WS','WD','TKE']
-variables_ast=['temperature','rh']
-variables_met=['average_wind_speed','wind_direction','temperature','relative_humidity']
+variables_ast=['temperature','waterVapor']
+variables_met=['average_wind_speed','wind_direction','temperature','waterVapor']
 variables_snc=['TKE']
 DT=1800#[s] common sampling time
+N_windows=5
+option='welch'
+max_nans_gap=np.timedelta64(7*24, 'h')
+
+#physics
+mm_v=18.015
+mm_a=28.96
 
 #qc
 max_TKE=10#[m^2/s^2] maximum TKE
@@ -41,9 +48,32 @@ max_gamma=5#maximum weight of the prior
 max_rmsr=5#maximum rms of the retrieval
 
 #graphics
+variables={'WS':'average_wind_speed','WD':'wind_direction','TKE':'TKE','temperature':'temperature','waterVapor':'waterVapor'}
+T_plot=np.arange(1000*3600)+0.0
+height=[]
 
-variables={'WS':'average_wind_speed','WD':'wind_direction','TKE':'TKE','temperature':'temperature','rh':'relative_humidity'}
+#%% Function
+def spectrum(x,DT,option,N_windows):
+    if option=='fft':
+        f,p0=signal.periodogram(x,fs=1/DT,scaling='density')
+    elif option=='welch':
+        f, p0= signal.welch(x, fs=1/DT, nperseg=int(len(x)/N_windows))
+        
+    p=p0*f**2
+    p_norm=-p/np.trapz(p[1:],1/f[1:])
+    return f,p_norm
 
+def vapor_pressure(T):
+    e=T*0
+    A=7.5
+    B=237.3
+    e[T>=0]=6.11*10**((A*T[T>=0])/(T[T>=0]+B))*100
+    
+    A=9.5
+    B=265.5
+    e[T<0]=6.11*10**((A*T[T<0])/(T[T<0]+B))*100
+
+    return e
 
 #%% Initialization
 
@@ -54,7 +84,6 @@ with open(source_config, 'r') as fid:
 #imports
 sys.path.append(config['path_utils'])
 import utils as utl
-
 
 #load data
 LID=xr.open_dataset(source_lid)
@@ -70,7 +99,8 @@ PSD_sfc={}
 T_sfc={}
 
 #graphics
-height=LID.height.values
+if height==[]:
+    height=LID.height.values
 colormap = plt.cm.viridis
 colors = [colormap(i) for i in np.linspace(0,1,len(height))]
 
@@ -83,30 +113,43 @@ TKE_int=TKE_qc.chunk({"time": -1}).interpolate_na(dim='time',method='linear')
 TKE_int=TKE_int.where(original_nans==False)
 LID['TKE']=TKE_int
 
-WD_lin=LID.WD.values
-for i in range(1,len(LID.time)):
-    for i_h in range(len(LID.height)):
-        WD_lin[i,i_h]=WD_lin[i-1,i_h]+utl.ang_diff(LID.WD.values[i,i_h],LID.WD.values[i-1,i_h])
-
 AST['height']=AST.height*1000
 AST['cbh']=AST.cbh*1000
 AST['cbh'][AST['lwp']<min_lwp]=10000
-AST=AST.where(AST['height']<AST['cbh']).where(AST['rmsr']<max_rmsr).where(AST['gamma']<max_gamma)
 
-for v in variables_met:
-    MET[v]=MET[v].where(MET['qc_'+v]==0)
+for v in variables_ast: 
+    AST[v]=AST[v].where(AST['height']<AST['cbh']).where(AST['rmsr']<max_rmsr).where(AST['gamma']<max_gamma)
+
+for v in MET.data_vars:
+    try:
+        MET[v]=MET[v].where(MET['qc_'+v]==0)
+    except:
+        pass
 
 SNC=SNC.where(SNC['QC flag']==0).sortby('time')
 
+
+#mixing ratio
+MET['saturated_vapor_pressure']=vapor_pressure(MET['temperature'])
+MET['waterVapor']=mm_v/mm_a*MET['relative_humidity']/100*MET['saturated_vapor_pressure']/(MET['pressure']*1000-MET['relative_humidity']/100*MET['saturated_vapor_pressure'])*1000
+
 #interpolation
+max_nans_edges=int(np.int(max_nans_gap/np.median(np.diff(LID.time))))
 for v in variables_lid:
-    LID[v]=LID[v].interpolate_na(dim='time',method='linear')
+    LID[v]=LID[v].interpolate_na(dim='time',method='linear',max_gap=max_nans_gap).ffill(dim="time",limit=max_nans_edges).bfill(dim="time",limit=max_nans_edges)
+max_nans_edges=int(np.int(max_nans_gap/np.median(np.diff(AST.time))))
 for v in variables_ast:
-    AST[v]=AST[v].interpolate_na(dim='time',method='linear')
+    AST[v]=AST[v].interpolate_na(dim='time',method='linear',max_gap=max_nans_gap).ffill(dim="time",limit=max_nans_edges).bfill(dim="time",limit=max_nans_edges)
+max_nans_edges=int(np.int(max_nans_gap/np.median(np.diff(MET.time))))
 for v in variables_met:
-    MET[v]=MET[v].interpolate_na(dim='time',method='linear')
+    MET[v]=MET[v].interpolate_na(dim='time',method='linear',max_gap=max_nans_gap).ffill(dim="time",limit=max_nans_edges).bfill(dim="time",limit=max_nans_edges)
+max_nans_edges=int(np.int(max_nans_gap/np.median(np.diff(SNC.time))))
 for v in variables_snc:
-    SNC[v]=SNC[v].interpolate_na(dim='time',method='linear')
+    SNC[v]=SNC[v].interpolate_na(dim='time',method='linear',max_gap=max_nans_gap).ffill(dim="time",limit=max_nans_edges).bfill(dim="time",limit=max_nans_edges)
+    
+#wind direction unwrapping
+LID['WD'].values=np.unwrap(LID.WD,period=360,axis=0)
+MET['wind_direction'].values=np.unwrap(MET.wind_direction,period=360,axis=0)
 
 #psd of remote sensing
 for v in variables_lid+variables_ast: 
@@ -116,18 +159,21 @@ for v in variables_lid+variables_ast:
         print(v+': z = '+str(h)+' m') 
         
         if v in variables_lid:
-            f_sel=LID[v].sel(height=h)
+            f_sel=LID[v].sel(height=h,method='nearest')
         elif v in variables_ast:
-            f_sel=AST[v].sel(height=h)
+            f_sel=AST[v].sel(height=h,method='nearest')
         
         tnum= [utl.dt64_to_num(t) for t in f_sel.time.values]
         tnum_res=np.arange(np.min(tnum),np.max(tnum)+1,DT)
         f=np.interp(tnum_res,tnum,f_sel.values)
-        
-        f_psd,psd=signal.periodogram(f[1:-1], fs=1/DT,  scaling='density')
+        if np.sum(np.isnan(f))==0:
+            f_det=signal.detrend(f)
+        else:
+            f_det=f.copy()
+        f_psd,psd=spectrum(f_det, DT,option,N_windows)
     
         period=utl.vstack(period,(1/f_psd))
-        psd_T=utl.vstack(psd_T,(psd/np.var(f[1:-1])*f_psd**2))
+        psd_T=utl.vstack(psd_T,psd)
     
     PSD[v]=psd_T
     T[v]=period
@@ -143,36 +189,50 @@ for v in variables_met+variables_snc:
     tnum_res=np.arange(np.min(tnum),np.max(tnum)+1,DT)
     f=np.interp(tnum_res,tnum,f_sel.values)
     
-    f_psd,psd=signal.periodogram(f[1:-1], fs=1/DT,  scaling='density')
+    if np.sum(np.isnan(f))==0:
+        f_det=signal.detrend(f)
+    else:
+        f_det=f.copy()
+    f_psd,psd=spectrum(f_det, DT,option,N_windows)
 
-    PSD_sfc[v]=(psd/np.var(f[1:-1])*f_psd**2)
-    T_sfc[v]=(1/f_psd)
+    PSD_sfc[v]=psd
+    T_sfc[v]=1/f_psd
     
 #%% Plots
+
 plt.close('all')
-ctr=1
-fig=plt.figure(figsize=(12,10))
-
 for v in variables:
-    ax=plt.subplot(len(variables),1,ctr)
-    ctr2=0
-    for i_h in range(len(height)):
-        plt.semilogx(T[v][i_h,:]/3600,PSD[v][i_h,:],label=r'$z='+str(int(height[i_h]))+'$ m',color=colors[ctr2],alpha=0.75)
-        ctr2+=1
-    plt.xticks([6,12,24,48],labels=['6','12','24','48'])
-    plt.xlim([2,100])
-    plt.ylim([10**-8,10**-3])
-   
-    if ctr==len(variables):
-        plt.xlabel('Period [hours]')
-    else:
-        ax.set_xticklabels([])
-    plt.ylabel('PSD [hours$^{-1}$]')
-    plt.semilogx(T_sfc[variables[v]]/3600,PSD_sfc[variables[v]],label='Surface',color='k',alpha=1)
-    # plt.title(v)
-    plt.grid()
+    plt.figure()
+    plt.pcolor(T[v][0,1:]/3600,height,np.log10(PSD[v][:,1:]),cmap='hot',vmin=-8,vmax=-2)
+    ax=plt.gca()
+    ax.set_xscale('log')
+    plt.xlim([2,1000])
+    plt.ylim([0,3000])
+    plt.colorbar(label=v)
+    plt.xlabel('Period [hour]')
+    plt.ylabel(r'$z$ [m.a.g.l.]')
     
-    ctr+=1
-
-plt.tight_layout()
-plt.legend()
+if len(height)<10:
+    ctr=1
+    fig=plt.figure(figsize=(18,10))
+    
+    for v in variables:
+        
+        ctr2=0
+        for i_h in range(len(height)):
+            ax=plt.subplot(len(height),len(variables),ctr+(len(variables)-ctr2)*len(variables))
+            plt.loglog(T[v][i_h,:]/3600,PSD[v][i_h,:],label=r'$z='+str(int(height[i_h]))+'$ m',color=colors[ctr2],alpha=1,linewidth=1)
+            if i_h==0:
+                plt.loglog(T_sfc[variables[v]]/3600,PSD_sfc[variables[v]],label='Surface',color='k',alpha=1,linewidth=1)
+            ctr2+=1
+            plt.xticks([6,12,24,100,24*7])
+            plt.xlim([2,1000])
+            plt.ylim([10*-8,10**-3])
+            plt.yticks([10**-8,10**-5,10**-3])
+            ax.set_xticklabels([])
+            plt.grid()
+    
+        ctr+=1
+    
+    plt.tight_layout()
+    # plt.legend()
