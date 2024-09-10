@@ -12,10 +12,9 @@ import xarray as xr
 from matplotlib import pyplot as plt
 from datetime import datetime
 
-
 #%% Inputs
 source_lyt=os.path.join(cd, 'data/20231026_AWAKEN_layout.nc')
-WD=np.arange(0,360,1)#[deg]
+WD=np.arange(0,360,1)#[deg] set of wind directions
 
 #graphics
 site_plot='A1'
@@ -24,6 +23,7 @@ site_plot='A1'
 TRB=xr.open_dataset(source_lyt,group='Turbines')
 SIT=xr.open_dataset(source_lyt,group='Ground sites')
 
+#site
 D=TRB['Diameter'].values
 D[np.isnan(D)]=np.nanmax(D)
 xT=TRB['x UTM'].values
@@ -31,9 +31,9 @@ yT=TRB['y UTM'].values
 
 #zeroing
 waked=np.zeros((len(SIT['Site name']),len(WD)))
-i_s=0
 
 #%% Main
+i_s=0
 for s in SIT['Site name'].values:
     i_wd=0
     for wd in WD:
@@ -42,13 +42,11 @@ for s in SIT['Site name'].values:
         
         L,th0=utl.cart2pol(xT-x0, yT-y0)#relative distance and orientation
         
-        wd_align=(90-th0)%360
-        
-        wd_diff=np.abs(utl.ang_diff(wd_align,wd))
-        
-        waked_sector=1.3*utl.arctand(2.5*D/L+0.15)+10#[IEC 61400-12-1:2017]
-        
+        wd_align=(90-th0)%360#wind direction of maximum wake interaction
+        wd_diff=np.abs(utl.ang_diff(wd_align,wd))#different from maximum wake direction
+        waked_sector=1.3*utl.arctand(2.5*D/L+0.15)+10#[IEC 61400-12-1:2017] waked sector
         waking=wd_diff<waked_sector/2
+        
         if np.sum(waking)>0:
             waked[i_s,i_wd]=np.nanmin(L[waking]/D[waking])
         else:
@@ -88,7 +86,7 @@ Output = xr.Dataset({
 'waked': xr.DataArray(
             data   = waked,   # enter data here
             dims   = ['site','wind_direction'],
-            coords = {'site': np.array(Sites.index),'wind_direction':WD},
+            coords = {'site': SIT['Site_name'].values,'wind_direction':WD},
             attrs  = {'_FillValue': -9999,'description':'Distance of the closest waking turbine'})})
 
 Output.to_netcdf('data/'+datetime.strftime(datetime.now(),'%Y%m%d')+'_AWAKEN_waked.nc')
