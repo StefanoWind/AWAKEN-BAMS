@@ -10,6 +10,10 @@ import utils as utl
 import numpy as np
 import xarray as xr
 from matplotlib import pyplot as plt
+import matplotlib
+matplotlib.rcParams['font.family'] = 'serif'
+matplotlib.rcParams['mathtext.fontset'] = 'cm'
+matplotlib.rcParams['font.size'] = 16
 
 #%% Inputs
 source_wak=os.path.join(cd, 'data/20240910_AWAKEN_waked.nc')
