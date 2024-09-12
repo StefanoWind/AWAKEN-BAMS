@@ -22,10 +22,10 @@ matplotlib.rcParams['font.size'] = 18
 source_config=os.path.join(cd,'config.yaml')
 
 #dataset
-source_lid=os.path.join(cd,'data/sa1.lidar.z03.c1.20230101.20240101.6_levels.nc')
-source_ast=os.path.join(cd,'data/6 heights/sb.assist.z01.c0.20230101.6_levels.20240101.nc')
-source_met=os.path.join(cd,'data/6 heights/sa2.met.z01.c0.20230101.6_levels.20240101.nc')
-source_snc=os.path.join(cd,'data/6 heights/sa2.sonic.z01.c0.20230101.6_levels.20240101.nc')
+source_lid=os.path.join(cd,'data/sa1.lidar.z03.c1.20230101.20240101.5_levels.nc')
+source_ast=os.path.join(cd,'data/sb.assist.z01.c0.20230101.20240101.5_levels.nc')
+source_met=os.path.join(cd,'data/sa2.met.z01.c0.20230101.20240101.nc')
+source_snc=os.path.join(cd,'data/sa2.sonic.z01.c0.20230101.20240101.nc')
 
 #user-defined
 variables_lid=['WS','WD','TKE']
@@ -33,13 +33,13 @@ variables_ast=['temperature','waterVapor']
 variables_met=['average_wind_speed','wind_direction','temperature','waterVapor']
 variables_snc=['TKE']
 DT=1800#[s] common sampling time
-N_windows=5
-option='welch'
-max_nans_gap=np.timedelta64(7*24, 'h')
+N_windows=5#windows of Welch
+option='welch'#type of fft
+max_nans_gap=np.timedelta64(7*24, 'h')#maximum consecutive nans
 
 #physics
-mm_v=18.015
-mm_a=28.96
+mm_v=18.015#[g/mol] molecular mass of water
+mm_a=28.96#[g/mol] molecular mass of air
 
 #qc
 max_TKE=10#[m^2/s^2] maximum TKE
@@ -94,7 +94,6 @@ SNC=xr.open_dataset(source_snc)
 #zeroing
 PSD={}
 T={}
-
 PSD_sfc={}
 T_sfc={}
 
@@ -200,6 +199,7 @@ for v in variables_met+variables_snc:
     
 #%% Plots
 
+#colormap
 plt.close('all')
 for v in variables:
     plt.figure()
@@ -212,27 +212,30 @@ for v in variables:
     plt.xlabel('Period [hour]')
     plt.ylabel(r'$z$ [m.a.g.l.]')
     
+#linear plot
+
+    
 if len(height)<10:
     ctr=1
     fig=plt.figure(figsize=(18,10))
     
     for v in variables:
-        
-        ctr2=0
+
         for i_h in range(len(height)):
-            ax=plt.subplot(len(height),len(variables),ctr+(len(variables)-ctr2)*len(variables))
-            plt.loglog(T[v][i_h,:]/3600,PSD[v][i_h,:],label=r'$z='+str(int(height[i_h]))+'$ m',color=colors[ctr2],alpha=1,linewidth=1)
+            ax=plt.subplot(1,len(variables),ctr)
+            plt.loglog(T[v][i_h,:]/3600,PSD[v][i_h,:]*10**(i_h*3),color='k',alpha=1,linewidth=1)
+            if ctr==1:
+                plt.text(30,PSD[v][i_h,-1]*10**(i_h*3),str(int(height[i_h]))+' m AGL',bbox={'alpha':0.1,'facecolor':'w'})
             if i_h==0:
-                plt.loglog(T_sfc[variables[v]]/3600,PSD_sfc[variables[v]],label='Surface',color='k',alpha=1,linewidth=1)
-            ctr2+=1
-            plt.xticks([6,12,24,100,24*7])
+                plt.loglog(T_sfc[variables[v]]/3600,PSD_sfc[variables[v]]*10**(-3),label='Surface',color='k',alpha=1,linewidth=1)
+                if ctr==1:
+                    plt.text(30,PSD_sfc[variables[v]][-1]*10**(-3),'Surface',bbox={'alpha':0.1,'facecolor':'w'})
+            plt.xticks([6,12,24,24*4])
             plt.xlim([2,1000])
-            plt.ylim([10*-8,10**-3])
-            plt.yticks([10**-8,10**-5,10**-3])
-            ax.set_xticklabels([])
+            # plt.ylim([10*-8,10])
+            plt.yticks([])
+            ax.set_xticklabels(['6 h','12 h','1 day','4 days'],rotation=30)
             plt.grid()
-    
         ctr+=1
     
     plt.tight_layout()
-    # plt.legend()

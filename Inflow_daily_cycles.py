@@ -217,9 +217,10 @@ for v in variables_lid+variables_ast:
         mn=month_name[m]
         ax=fig.add_subplot(gs[ctr2+1,ctr1])
         cf=plt.contourf(hour_avg,ALL_avg[mn].height,ALL_avg[mn][v].T,ticks[v],cmap='coolwarm',extend='both')
+        plt.contour(hour_avg,ALL_avg[mn].height,ALL_avg[mn][v].T,ticks[v],colors='k',linewidths=0.5,linestyles='solid')
         if ctr1==0:
             plt.ylabel(r'$z$ [m AGL]')
-            plt.text(0,1700,mn,fontweight='bold',bbox={'alpha':0.1,'facecolor':'w'})
+            plt.text(0.3,1500,mn,fontweight='bold',bbox={'alpha':0.25,'facecolor':'w'})
         else:
             ax.set_yticklabels([])
         ax.set_xticks([0,6,12,18,24])
@@ -253,9 +254,10 @@ for v in variables_lid+variables_ast:
         wdn=wd_name[w]
         ax=fig.add_subplot(gs[ctr2+1,ctr1])
         cf=plt.contourf(hour_avg,ALL_avg[wdn].height,ALL_avg[wdn][v].T,ticks[v],cmap='coolwarm',extend='both')
+        plt.contour(hour_avg,ALL_avg[wdn].height,ALL_avg[wdn][v].T,ticks[v],colors='k',linewidths=0.5,linestyles='solid')
         if ctr1==0:
             plt.ylabel(r'$z$ [m AGL]')
-            plt.text(0,1700,wd_name[wd1],fontweight='bold',bbox={'alpha':0.1,'facecolor':'w'})
+            plt.text(0.3,1500,wdn,fontweight='bold',bbox={'alpha':0.25,'facecolor':'w'})
         else:
             ax.set_yticklabels([])
         ax.set_xticks([0,6,12,18,24])
