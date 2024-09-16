@@ -165,6 +165,9 @@ Output['WD']=xr.DataArray(data=WD_file[sel_WS*sel_WD*sel_TI*sel_vol],coords={'in
 Output['TI']=xr.DataArray(data=TI_file[sel_WS*sel_WD*sel_TI*sel_vol],coords={'index':np.arange(len(files_dap_sel))})
 Output.attrs['start_date']=sdate
 Output.attrs['end_date']=edate
+Output.attrs['WS_bin']=WS_bin
+Output.attrs['WD_bin']=WD_bin
+Output.attrs['TI_bin']=TI_bin
 Output.to_netcdf(os.path.join(config['path_data'],channel,dirname,dirname+'.stats.nc'))
 
 #%% Plots
