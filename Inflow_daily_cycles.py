@@ -203,6 +203,11 @@ for wd1,wd2 in zip(bin_wd[:-1],bin_wd[1:]):
            
         ALL_avg[wd_name[wd1]][v]=xr.DataArray(data=f_avg_all.T,coords={'hour':hour_avg,'height':ALL_sel.height.values}).interpolate_na(dim='height',limit=2).interpolate_na(dim='hour',limit=1)
 
+#%% Output
+ALL.to_netcdf(os.path.join(cd,'data','inflow_all.nc'))
+for v in ALL_avg.keys():
+    ALL_avg[v].to_netcdf(os.path.join(cd,'data','inflow_avg_'+v+'.nc'))
+
 #%% Plots
 
 #seasons
