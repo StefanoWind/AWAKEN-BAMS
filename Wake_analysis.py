@@ -29,15 +29,18 @@ channel='awaken/rt1.lidar.z02.a0'
 regex='\d{8}\.\d{1}\d*[13579]20\d{2}\.user5.nc'#regexp to select data from DAP
 sdate='20230501000000'#start date
 edate='20230901000000'#end date
+time_search=30#[days] window for searh
+ext1='user5'
+file_type='nc'
 
 #stats
 max_TI=50#[%] maximum TI
 WS_bin=[5,8]#[m/s] bin in wind speed
-WD_bin=[135,225]#[deg] bin in wind direction
+WD_bin=[160,200]#[deg] bin in wind direction
 TI_bin=[0,10]#[%] bins i turbulent intensity
 perc_lim=[5,95]#[%] outlier rejection
 p_value=0.05#p-value for confidence interval
-max_err_u=0.2#maximumm error in mean normalized streamwise velocity
+max_err_u=0.2#maximum error in mean normalized streamwise velocity
 max_err_TI=4#maximumm error in mean turbulence intensity
 
 #site
@@ -45,11 +48,35 @@ D=127#[m] rotor diameter
 H=90#[m] hub height
 
 #graphics
+
 #plot area[D]
 ymin=-2
 ymax=2
 zmin=-1
 zmax=2
+
+#%% Function 
+def dap_search(channel,sdate,edate,file_type,ext1,time_search):
+    '''
+    Wrapper for a2e.search to avoid timeout
+    '''
+    dates_num=np.arange(utl.datenum(sdate,'%Y%m%d%H%M%S'),utl.datenum(edate,'%Y%m%d%H%M%S'),time_search*24*3600)
+    dates=[utl.datestr(d,'%Y%m%d%H%M%S') for d in dates_num]+[edate]
+    search=[]
+    for d1,d2 in zip(dates[:-1],dates[1:]):
+        _filter = {
+            'Dataset': channel,
+            'date_time': {
+                'between': [d1,d2]
+            },
+            'file_type': 'nc',
+            'ext1':'user5', 
+        }
+        
+        search+=a2e.search(_filter)
+    
+    return search
+    
         
 #%% Initialization
 
@@ -71,14 +98,7 @@ time_log=np.array([utl.num_to_dt64(t) for t in tnum_log])
 LOG=LOG.set_index('UTC Time')
 
 #WDH setup
-_filter = {
-    'Dataset': channel,
-    'date_time': {
-        'between': [sdate,edate]
-    },
-    'file_type': 'nc',
-    'ext1':'user5', 
-}
+
 a2e = DAP('a2e.energy.gov',confirm_downloads=False)
 
 #naming
@@ -90,10 +110,10 @@ dirname=(str(WS_bin)+str(WD_bin)+str(TI_bin)).replace(' ','').replace(',','.').r
 LOG['Rotor-averaged TI [%]']=LOG['Rotor-averaged TI [%]'].where(LOG['Rotor-averaged TI [%]']>0).where(LOG['Rotor-averaged TI [%]']<max_TI)
 
 #list files
-files_dap=a2e.search(_filter)
+files_dap=dap_search(channel,sdate,edate,file_type,ext1,time_search)
 if files_dap is None:
     a2e.setup_two_factor_auth(username=config['username'], password=config['password'])
-    files_dap=a2e.search(_filter)
+    files_dap=dap_search(channel,sdate,edate,file_type,ext1,time_search)
 
 #select files
 tnum_file=[utl.datenum(f['date_time'],'%Y%m%d%H%M%S') for f in files_dap]
@@ -158,7 +178,11 @@ TI_avg_qc=TI_avg.where(TI_top-TI_low<max_err_TI)
 #%% Output
 Output=xr.Dataset()
 Output['u_avg']=u_avg
+Output['u_low']=u_low
+Output['u_top']=u_top
 Output['TI_avg']=TI_avg
+Output['TI_low']=TI_low
+Output['TI_top']=TI_top
 Output['files']=xr.DataArray(data=[f['Filename'] for f in files_dap_sel],coords={'index':np.arange(len(files_dap_sel))})
 Output['WS']=xr.DataArray(data=WS_file[sel_WS*sel_WD*sel_TI*sel_vol],coords={'index':np.arange(len(files_dap_sel))})
 Output['WD']=xr.DataArray(data=WD_file[sel_WS*sel_WD*sel_TI*sel_vol],coords={'index':np.arange(len(files_dap_sel))})
