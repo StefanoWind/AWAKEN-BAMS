@@ -28,7 +28,7 @@ source_log='data/20230101.000500-20240101.224500.awaken.glob.summary.csv'
 channel='awaken/rt1.lidar.z02.a0'
 regex='\d{8}\.\d{1}\d*[13579]20\d{2}\.user5.nc'#regexp to select data from DAP
 sdate='20230501000000'#start date
-edate='20230901000000'#end date
+edate='20240430000000'#end date
 time_search=30#[days] window for searh
 ext1='user5'
 file_type='nc'
@@ -62,7 +62,7 @@ def dap_search(channel,sdate,edate,file_type,ext1,time_search):
     '''
     dates_num=np.arange(utl.datenum(sdate,'%Y%m%d%H%M%S'),utl.datenum(edate,'%Y%m%d%H%M%S'),time_search*24*3600)
     dates=[utl.datestr(d,'%Y%m%d%H%M%S') for d in dates_num]+[edate]
-    search=[]
+    search_all=[]
     for d1,d2 in zip(dates[:-1],dates[1:]):
         _filter = {
             'Dataset': channel,
@@ -73,9 +73,16 @@ def dap_search(channel,sdate,edate,file_type,ext1,time_search):
             'ext1':'user5', 
         }
         
-        search+=a2e.search(_filter)
+        
+        search=a2e.search(_filter)
+        
+        if search is None:
+            print('Invalid authentication')
+            return None
+        else:
+            search_all+=search
     
-    return search
+    return search_all
     
         
 #%% Initialization
