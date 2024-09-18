@@ -36,8 +36,8 @@ file_type='nc'
 #stats
 max_TI=50#[%] maximum TI
 WS_bin=[5,8]#[m/s] bin in wind speed
-WD_bin=[160,200]#[deg] bin in wind direction
-TI_bin=[0,10]#[%] bins i turbulent intensity
+WD_bin=[360-45,45]#[deg] bin in wind direction
+TI_bin=[0,5]#[%] bins i turbulent intensity
 perc_lim=[5,95]#[%] outlier rejection
 p_value=0.05#p-value for confidence interval
 max_err_u=0.2#maximum error in mean normalized streamwise velocity
@@ -133,7 +133,11 @@ TI_file=   np.interp(tnum_file,tnum_log,LOG['Rotor-averaged TI [%]'])
 
 sel_vol=np.array([len(re.findall(regex, f['Filename']))>0 for f in files_dap])
 sel_WS=(WS_file>=WS_bin[0])*(WS_file<WS_bin[1])
-sel_WD=(WD_file>=WD_bin[0])*(WD_file<WD_bin[1])
+if WD_bin[0]<WD_bin[1]:
+    sel_WD=(WD_file>=WD_bin[0])*(WD_file<WD_bin[1])
+else:
+    sel_WD=(WD_file>=WD_bin[0])*(WD_file<360)+(WD_file>=0)*(WD_file<WD_bin[1])
+
 sel_TI=(TI_file>=TI_bin[0])*(TI_file<TI_bin[1])
 files_dap_sel=np.array(files_dap)[sel_WS*sel_WD*sel_TI*sel_vol]
 
