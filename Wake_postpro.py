@@ -22,7 +22,7 @@ matplotlib.rcParams['font.size'] = 16
 #%% Inputs
 source_config=os.path.join(cd,'config.yaml')
 source_log='data/20230101.000500-20240101.224500.awaken.glob.summary.csv'
-source_stats=os.path.join(cd,'data/awaken/rt1.lidar.z02.a0/unwaked/*stats.nc')
+source_stats=os.path.join(cd,'data/awaken/rt1.lidar.z02.a0/waked/*stats.nc')
 
 #site
 D=127#[m] rotor diameter
@@ -150,7 +150,7 @@ for s in files:
     utl.draw_turbine(0,H/D, 1,270)
     if ctr==len(files):
         plt.xlabel(r'$x/D$')
-    plt.ylabel(r'$x/D$')
+    plt.ylabel(r'$z/D$')
     if ctr==1:
         plt.title(r'$\theta_w\in['+str(Data.attrs['WD_bin'][0])+','+str(Data.attrs['WD_bin'][1])+r')^\circ$')
         
