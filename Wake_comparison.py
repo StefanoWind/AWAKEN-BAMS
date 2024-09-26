@@ -20,8 +20,8 @@ matplotlib.rcParams['font.size'] = 12
 #%% Inputs
 source_config=os.path.join(cd,'config.yaml')
 source_log='data/20230101.000500-20240101.224500.awaken.glob.summary.csv'
-source1=os.path.join(cd,'data/awaken/rt1.lidar.z02.a0/unwaked/5.8.135.225.00.05.stats.nc')
-source2=os.path.join(cd,'data/awaken/rt1.lidar.z02.a0/waked/5.8.0.90.00.05.stats.nc')
+source1=os.path.join(cd,'data/awaken/rt1.lidar.z02.a0/unwaked/5.8.135.225.10.20.stats.nc')
+source2=os.path.join(cd,'data/awaken/rt1.lidar.z02.a0/waked/5.8.315.45.10.20.stats.nc')
 
 #site
 D=127#[m] rotor diameter
@@ -158,7 +158,7 @@ ax.view_init(40,413)
 plt.title(r'$\theta_w\in['+str(Data1.attrs['WD_bin'][0])+','+str(Data1.attrs['WD_bin'][1])+r')^\circ$')
 
 utl.draw_turbine_3d(ax,0,0,H/D,1,H/D,90)
-cb=plt.colorbar(cf,label=r'$\overline{u} ~ U_\infty^{-1}$')
+cb=plt.colorbar(cf,label=r'$I_u$ [%]')
 cb.ax.set_position([0.8, 0.2, 0.015, 0.6]) 
 
 #plot 3D wake (TI2)
@@ -182,7 +182,7 @@ ax.view_init(40,413)
 plt.title(r'$\theta_w\in['+str(Data2.attrs['WD_bin'][0])+','+str(Data2.attrs['WD_bin'][1])+r')^\circ$')
 
 utl.draw_turbine_3d(ax,0,0,H/D,1,H/D,90)
-cb=plt.colorbar(cf,label=r'$\overline{u} ~ U_\infty^{-1}$')
+cb=plt.colorbar(cf,label=r'$I_u$ [%]')
 cb.ax.set_position([0.8, 0.2, 0.015, 0.6]) 
 
 
@@ -207,7 +207,7 @@ ax.view_init(40,413)
 plt.title(r'Difference $\theta_w\in['+str(Data2.attrs['WD_bin'][0])+','+str(Data2.attrs['WD_bin'][1])+r')^\circ$ - $\theta_w\in['+str(Data1.attrs['WD_bin'][0])+','+str(Data1.attrs['WD_bin'][1])+r')^\circ$')
 
 utl.draw_turbine_3d(ax,0,0,H/D,1,H/D,90)
-cb=plt.colorbar(cf,label=r'$\Delta \overline{u} ~ U_\infty^{-1}$')
+cb=plt.colorbar(cf,label=r'$\Delta I_u$ [%]')
 cb.ax.set_position([0.8, 0.2, 0.015, 0.6]) 
  
  
