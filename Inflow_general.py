@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Calculated psd of inflow variables
+Windroses and stability plots
 """
 import os
 cd=os.path.dirname(__file__)
