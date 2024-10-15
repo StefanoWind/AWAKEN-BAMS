@@ -45,7 +45,7 @@ variables=['temperature','waterVapor','dtheta_v_dz','perc_stable']
 
 #graphics
 labels={'temperature':r'$T$ [$^\circ$C]','waterVapor':r'$r$ [g Kg$^{-1}$]',
-        'dtheta_v_dz':r'$\frac{\partial \theta_v}{\partial z}$ [$^\circ$C]','perc_stable':r'Occurrence of $\frac{\partial \theta_v}{\partial z}>0$ [%]'}
+        'dtheta_v_dz':r'$\frac{\partial \theta_v}{\partial z}$ [$^\circ$C m$^{-1}$]','perc_stable':r'Occurrence of $\frac{\partial \theta_v}{\partial z}>0$ [%]'}
 ticks={'temperature':np.arange(15,31),'waterVapor':np.arange(5,15,0.5),'dtheta_v_dz':np.arange(-0.05,0.051,0.0025),'perc_stable':np.arange(0,101,10)}
 colormaps={'temperature':'coolwarm','waterVapor':'Blues','dtheta_v_dz':'seismic','perc_stable':'viridis'}
 
@@ -124,6 +124,7 @@ for h in height:
 AST_avg['perc_stable']=xr.DataArray(data=perc_stable.T,coords={'hour':hour_avg,'height':AST.height.values}).interpolate_na(dim='height',limit=2).interpolate_na(dim='hour',limit=1)
     
 #%% Plots
+plt.close('all')
 fig=plt.figure(figsize=(16,8))
 
 #plot T,r variables
@@ -136,7 +137,7 @@ for v in variables[:2]:
     plt.ylabel(r'$z$ [m AGL]')
         
     ax.set_xticks([0,6,12,18,24])
-    if ctr==len(variables):
+    if ctr==2:
         plt.xlabel('Hour (UTC)')
     else:
         ax.set_xticklabels([])
@@ -159,7 +160,7 @@ for v in variables[2:]:
     plt.ylabel(r'$z$ [m AGL]')
         
     ax.set_xticks([0,6,12,18,24])
-    if ctr==len(variables):
+    if ctr==2:
         plt.xlabel('Hour (UTC)')
     else:
         ax.set_xticklabels([])
