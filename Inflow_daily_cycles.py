@@ -4,10 +4,7 @@ Calculated psd of inflow variables
 """
 import os
 cd=os.path.dirname(__file__)
-import sys
-sys.path.append('C:/Users/SLETIZIA/OneDrive - NREL/Desktop/PostDoc/utils')
 import utils as utl
-
 import numpy as np
 import pandas as pd
 import xarray as xr
@@ -21,35 +18,35 @@ matplotlib.rcParams['mathtext.fontset'] = 'cm'
 matplotlib.rcParams['font.size'] = 16
 
 #%% Inputs
-source_wak='data/20240910_AWAKEN_waked.nc'
-sites=['A1','A2','H']
-sources_lid={'A1':os.path.join(cd,'data/sa1.lidar.z03.c1.20230724.20230801.nc'),
-             'A2':os.path.join(cd,'data/sa2.lidar.z01.c1.20230724.20230801.nc'),
-              'H':os.path.join(cd,'data/sh.lidar.z02.c1.20230724.20230801.nc')}
+source_wak='data/20240910_AWAKEN_waked.nc'#source of wake distances
+sites=['A1','A2','H']#site names
 
-source_log=os.path.join(cd,'data/glob.lidar.eventlog.avg.c2.20230101.000500.csv')
+#sources of lidar data
+sources_lid={'A1':os.path.join(cd,'data/sa1.lidar.z03.c1.20230101.20240101.nc'),
+             'A2':os.path.join(cd,'data/sa2.lidar.z01.c1.20230101.20240101.nc'),
+              'H':os.path.join(cd,'data/sh.lidar.z02.c1.20230101.20240101.nc')}
+
+source_log=os.path.join(cd,'data/glob.lidar.eventlog.avg.c2.20230101.000500.csv')#inflow table source
 
 #user-defined
-variables=['WS','TKE log']
+variables=['WS','TKE log'] #selected variables
 
 #stats
-bin_month=np.arange(0,12.1,3)
-bin_hour=np.arange(25)
-bin_wd=[315,45,135,225,315]#[deg]
+bin_month=np.arange(0,12.1,3)#min in months
+bin_hour=np.arange(25)#bin in hours
+bin_wd=[315,45,135,225,315]#[deg] bin in wind direction
 perc_lim=[5,95]#[%] outlier rejection
 p_value=0.05#p-value for c.i.
 max_err={'WS':2,'TKE log':0.25}#maximum bootstrap 95% confidence interval width
-
-#qc
 max_TKE=10#[m^2/s^2] maximum TKE
 
 #graphics
 month_name={0:'DJF',3:'MAM',6:'JJA',9:'SON'}
 wd_name={315:'N',45:'E',135:'S',225:'W'}
-clim={'WS':[5,15],'TKE log':[-1.5,0.5]}
-labels={'WS':r'$U_\infty$ [m s$^{-1}$]','TKE log':r'TKE [m$^2$ s$^{-2}$]'}
-ticks={'WS':np.arange(5,15.1,0.5),'TKE log':np.arange(-1.5,0.5,0.1)}
-ticklabels={'WS':np.arange(5,15.1,0.5),'TKE log':np.round(10**np.arange(-1.5,0.5,0.1),2)}
+clim={'WS':[5,15],'TKE log':[-1.5,0.3]}
+labels={'WS':r'Wind speed [m s$^{-1}$]','TKE log':r'TKE [m$^2$ s$^{-2}$]'}
+ticks={'WS':np.arange(5,15.1,0.5),'TKE log':np.arange(-1.5,0.31,0.1)}
+ticklabels={'WS':np.arange(5,15.1,0.5),'TKE log':np.round(10**np.arange(-1.5,0.31,0.1),2)}
 
 #%% Initialization
 
@@ -115,8 +112,7 @@ max_wake_distance_rep=np.tile(max_wake_distance[:, np.newaxis, np.newaxis], (1, 
 
 unwaked=(wake_distance_rep==max_wake_distance_rep)+0.0
 unwaked[nans==1]=0
-unwaked_xr=xr.DataArray(data=unwaked,
-                     coords={'time':time_log,'height':height,'site':sites})
+unwaked_xr=xr.DataArray(data=unwaked,coords={'time':time_log,'height':height,'site':sites})
 weights=unwaked_xr/(unwaked_xr.sum(dim='site')+10**-10)
 
 #building unwaked lidar
@@ -128,7 +124,32 @@ for v in variables:
 
 
 ALL['month']=xr.DataArray(data=month,coords={'time':time_log})
-ALL['WD']=    xr.DataArray(data=wd,coords={'time':time_log})
+ALL['WD']=xr.DataArray(data=wd,coords={'time':time_log})
+
+#daily average
+ALL_avg['tot']=xr.Dataset()
+for v in variables:
+    f_avg_all=[]
+    for h in height:
+        f=ALL[v].sel(height=h).values
+        f[f==0]=np.nan
+        real=~np.isnan(f)
+        
+        if np.sum(real)>0:
+            f_avg= stats.binned_statistic(hour[real], f[real],statistic=lambda x:utl.filt_stat(x,np.nanmean,perc_lim=perc_lim),                             bins=bin_hour)[0]
+            f_low= stats.binned_statistic(hour[real], f[real],statistic=lambda x:utl.filt_BS_stat(x,np.nanmean,perc_lim=perc_lim,p_value=p_value/2*100),    bins=bin_hour)[0]
+            f_top= stats.binned_statistic(hour[real], f[real],statistic=lambda x:utl.filt_BS_stat(x,np.nanmean,perc_lim=perc_lim,p_value=(1-p_value/2)*100),bins=bin_hour)[0]
+
+            f_avg[np.abs(f_top-f_low)>max_err[v]]=np.nan
+            f_avg[np.isnan(np.abs(f_top-f_low))]=np.nan
+            
+            f_avg_all=utl.vstack(f_avg_all,f_avg)
+
+        else:
+            f_avg_all=utl.vstack(f_avg_all,hour_avg*np.nan)
+    
+    ALL_avg['tot'][v]=xr.DataArray(data=f_avg_all.T,coords={'hour':hour_avg,'height':ALL.height.values}).interpolate_na(dim='height',limit=2).interpolate_na(dim='hour',limit=1)
+
 
 #daily average (season)
 for m1,m2 in zip(bin_month[:-1],bin_month[1:]):
@@ -142,9 +163,9 @@ for m1,m2 in zip(bin_month[:-1],bin_month[1:]):
             real=~np.isnan(f)
             
             if np.sum(real)>0:
-                f_avg= stats.binned_statistic(hour[real], f[real],statistic=lambda x:utl.filt_mean(x,perc_lim=perc_lim),                             bins=bin_hour)[0]
-                f_low= stats.binned_statistic(hour[real], f[real],statistic=lambda x:utl.filt_BS_mean(x,perc_lim=perc_lim,p_value=p_value/2*100),    bins=bin_hour)[0]
-                f_top= stats.binned_statistic(hour[real], f[real],statistic=lambda x:utl.filt_BS_mean(x,perc_lim=perc_lim,p_value=(1-p_value/2)*100),bins=bin_hour)[0]
+                f_avg= stats.binned_statistic(hour[real], f[real],statistic=lambda x:utl.filt_stat(x,np.nanmean,perc_lim=perc_lim),                             bins=bin_hour)[0]
+                f_low= stats.binned_statistic(hour[real], f[real],statistic=lambda x:utl.filt_BS_stat(x,np.nanmean,perc_lim=perc_lim,p_value=p_value/2*100),    bins=bin_hour)[0]
+                f_top= stats.binned_statistic(hour[real], f[real],statistic=lambda x:utl.filt_BS_stat(x,np.nanmean,perc_lim=perc_lim,p_value=(1-p_value/2)*100),bins=bin_hour)[0]
     
                 f_avg[np.abs(f_top-f_low)>max_err[v]]=np.nan
                 f_avg[np.isnan(np.abs(f_top-f_low))]=np.nan
@@ -166,15 +187,14 @@ for wd1,wd2 in zip(bin_wd[:-1],bin_wd[1:]):
     for v in variables:
         f_avg_all=[]
         for h in height:
-            print(v+': '+str(h))
             f=ALL_sel[v].sel(height=h).values
             f[f==0]=np.nan
             real=~np.isnan(f)
             
             if np.sum(real)>0:
-                f_avg= stats.binned_statistic(hour[real], f[real],statistic=lambda x:utl.filt_mean(x,perc_lim=perc_lim),                             bins=bin_hour)[0]
-                f_low= stats.binned_statistic(hour[real], f[real],statistic=lambda x:utl.filt_BS_mean(x,perc_lim=perc_lim,p_value=p_value/2*100),    bins=bin_hour)[0]
-                f_top= stats.binned_statistic(hour[real], f[real],statistic=lambda x:utl.filt_BS_mean(x,perc_lim=perc_lim,p_value=(1-p_value/2)*100),bins=bin_hour)[0]
+                f_avg= stats.binned_statistic(hour[real], f[real],statistic=lambda x:utl.filt_stat(x,np.nanmean,perc_lim=perc_lim),                             bins=bin_hour)[0]
+                f_low= stats.binned_statistic(hour[real], f[real],statistic=lambda x:utl.filt_BS_stat(x,np.nanmean,perc_lim=perc_lim,p_value=p_value/2*100),    bins=bin_hour)[0]
+                f_top= stats.binned_statistic(hour[real], f[real],statistic=lambda x:utl.filt_BS_stat(x,np.nanmean,perc_lim=perc_lim,p_value=(1-p_value/2)*100),bins=bin_hour)[0]
     
                 f_avg[np.abs(f_top-f_low)>max_err[v]]=np.nan
                 f_avg[np.isnan(np.abs(f_top-f_low))]=np.nan
@@ -187,85 +207,66 @@ for wd1,wd2 in zip(bin_wd[:-1],bin_wd[1:]):
            
         ALL_avg[wd_name[wd1]][v]=xr.DataArray(data=f_avg_all.T,coords={'hour':hour_avg,'height':ALL_sel.height.values}).interpolate_na(dim='height',limit=2).interpolate_na(dim='hour',limit=1)
 
-# #%% Output
-# ALL.to_netcdf(os.path.join(cd,'data','inflow_all.nc'))
-# for v in ALL_avg.keys():
-#     ALL_avg[v].to_netcdf(os.path.join(cd,'data','inflow_avg_'+v+'.nc'))
-
 #%% Plots
-
-#seasons
 plt.close('all')
-fig=plt.figure(figsize=(16,8))
-gs = gridspec.GridSpec(len(month_name)+1, len(variables), height_ratios=[0.2]+[1]*len(month_name))  # 0.1 row for the colorbars
 
-ctr1=0
+# all
+fig=plt.figure(figsize=(16,4))
+ctr=0
 for v in variables:
-    ctr2=0
+    ax=plt.subplot(1,len(variables),ctr+1)
+    cf=plt.contourf(hour_avg,ALL_avg['tot'].height,ALL_avg['tot'][v].T,ticks[v],cmap='coolwarm',extend='both')
+    plt.contour(hour_avg,ALL_avg['tot'].height,ALL_avg['tot'][v].T,ticks[v],colors='k',linewidths=0.5,linestyles='solid',alpha=0.5)
+    plt.ylabel(r'$z$ [m a.g.l.]')
+    ax.set_xticks([0,6,12,18,24])
+    cbar=fig.colorbar(cf,label=labels[v])
+    cbar.set_ticks(ticks[v][::2])
+    cbar.set_ticklabels(ticklabels[v][::2])
+    plt.tight_layout(rect=[0, 0, 1, 0.9])
+    ctr+=1
+       
+#ws only
+for v in variables:
+    fig=plt.figure(figsize=(16,8))
+    gs = gridspec.GridSpec(len(month_name), 3, width_ratios=[1,1,0.05])  # 0.1 row for the colorbars
+    ctr=0
     for m in month_name:
         mn=month_name[m]
-        ax=fig.add_subplot(gs[ctr2+1,ctr1])
+        ax=fig.add_subplot(gs[ctr,0])
         cf=plt.contourf(hour_avg,ALL_avg[mn].height,ALL_avg[mn][v].T,ticks[v],cmap='coolwarm',extend='both')
-        plt.contour(hour_avg,ALL_avg[mn].height,ALL_avg[mn][v].T,ticks[v],colors='k',linewidths=0.5,linestyles='solid')
-        if ctr1==0:
-            plt.ylabel(r'$z$ [m AGL]')
-            plt.text(0.3,1500,mn,fontweight='bold',bbox={'alpha':0.25,'facecolor':'w'})
-        else:
-            ax.set_yticklabels([])
+        plt.contour(hour_avg,ALL_avg[mn].height,ALL_avg[mn][v].T,ticks[v],colors='k',linewidths=0.5,linestyles='solid',alpha=0.5)
+        
+        plt.ylabel(r'$z$ [m a.g.l.]')
+        plt.text(0.3,1600,mn,fontweight='bold',bbox={'alpha':0.25,'facecolor':'w'})
+   
         ax.set_xticks([0,6,12,18,24])
-        if ctr2==len(month_name)-1:
+        if ctr==len(month_name)-1:
             plt.xlabel('Hour (UTC)')
         else:
             ax.set_xticklabels([])
         plt.grid()
-        ctr2+=1
+        ctr+=1
         
-    cbar_ax = ax=fig.add_subplot(gs[0,ctr1])
-    cbar=fig.colorbar(cf, cax=cbar_ax, orientation='horizontal',label=labels[v])
-    cbar.set_ticks(ticks[v])
-    cbar.set_ticklabels(ticklabels[v])
-    cbar.ax.xaxis.set_ticks_position('top')
-    cbar.ax.xaxis.set_label_position('top')
-    cbar.ax.xaxis.set_tick_params(rotation=45)
-    plt.tight_layout(rect=[0, 0, 1, 0.9])
-
-    ctr1+=1
-plt.tight_layout()
-    
-#wind sectors
-fig=plt.figure(figsize=(16,8))
-
-ctr1=0
-for v in variables:
-    ctr2=0
+    ctr=0
     for w in wd_name:
         wdn=wd_name[w]
-        ax=fig.add_subplot(gs[ctr2+1,ctr1])
+        ax=fig.add_subplot(gs[ctr,1])
         cf=plt.contourf(hour_avg,ALL_avg[wdn].height,ALL_avg[wdn][v].T,ticks[v],cmap='coolwarm',extend='both')
-        plt.contour(hour_avg,ALL_avg[wdn].height,ALL_avg[wdn][v].T,ticks[v],colors='k',linewidths=0.5,linestyles='solid')
-        if ctr1==0:
-            plt.ylabel(r'$z$ [m AGL]')
-            plt.text(0.3,1500,wdn,fontweight='bold',bbox={'alpha':0.25,'facecolor':'w'})
-        else:
-            ax.set_yticklabels([])
+        plt.contour(hour_avg,ALL_avg[wdn].height,ALL_avg[wdn][v].T,ticks[v],colors='k',linewidths=0.5,linestyles='solid',alpha=0.5)
+        plt.text(0.3,1600,wdn,fontweight='bold',bbox={'alpha':0.25,'facecolor':'w'})
         ax.set_xticks([0,6,12,18,24])
-        if ctr2==len(month_name)-1:
+        if ctr==len(month_name)-1:
             plt.xlabel('Hour (UTC)')
         else:
             ax.set_xticklabels([])
-            
+        ax.set_yticklabels([])
         plt.grid()
-        ctr2+=1
+        ctr+=1
         
-        
-    cbar_ax = ax=fig.add_subplot(gs[0,ctr1])
-    cbar=fig.colorbar(cf, cax=cbar_ax, orientation='horizontal',label=labels[v])
+    cbar_ax = ax=fig.add_subplot(gs[:,2])
+    cbar=fig.colorbar(cf, cax=cbar_ax,label=labels[v])
     cbar.set_ticks(ticks[v])
     cbar.set_ticklabels(ticklabels[v])
-    cbar.ax.xaxis.set_ticks_position('top')
-    cbar.ax.xaxis.set_label_position('top')
     cbar.ax.xaxis.set_tick_params(rotation=45)
     plt.tight_layout(rect=[0, 0, 1, 0.9])
-        
-    ctr1+=1
-plt.tight_layout()
+    
