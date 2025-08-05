@@ -5,11 +5,19 @@ Extract lidar inflow data
 import os
 cd=os.path.dirname(__file__)
 from doe_dap_dl import DAP
+import sys
 import glob
 import yaml
 import xarray as xr
 
 #%% Inputs
+if len(sys.argv)==1:
+    sdate='20230724'#start date
+    edate='20230801'#end date
+else:
+    sdate=sys.argv[1]
+    edate=sys.argv[2]
+    
 source_config=os.path.join(cd,'configs/config.yaml')
 
 #dataset
@@ -17,8 +25,6 @@ channels=['awaken/sa1.lidar.z03.c1',
           'awaken/sa2.lidar.z01.c1',
           'awaken/sh.lidar.z02.c1']
              
-sdate='20230724'#start date
-edate='20230801'#end date
 max_height=2000#[m] maximum height
 
 #%% Initialization
