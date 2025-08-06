@@ -16,7 +16,7 @@ import matplotlib.gridspec as gridspec
 matplotlib.rcParams['font.family'] = 'serif'
 matplotlib.rcParams['mathtext.fontset'] = 'cm'
 matplotlib.rcParams['font.size'] = 16
-
+matplotlib.rcParams['savefig.dpi'] = 500
 #%% Inputs
 source_wak='data/20240910_AWAKEN_waked.nc'#source of wake distances
 sites=['A1','A2','H']#site names
@@ -210,6 +210,7 @@ for wd1,wd2 in zip(bin_wd[:-1],bin_wd[1:]):
 #%% Plots
 plt.close('all')
 
+matplotlib.rcParams['font.size'] = 20
 # all
 fig=plt.figure(figsize=(16,4))
 ctr=0
@@ -218,13 +219,15 @@ for v in variables:
     cf=plt.contourf(hour_avg,ALL_avg['tot'].height,ALL_avg['tot'][v].T,ticks[v],cmap='coolwarm',extend='both')
     plt.contour(hour_avg,ALL_avg['tot'].height,ALL_avg['tot'][v].T,ticks[v],colors='k',linewidths=0.5,linestyles='solid',alpha=0.5)
     plt.ylabel(r'$z$ [m a.g.l.]')
+    plt.xlabel('Hour (UTC)')
     ax.set_xticks([0,6,12,18,24])
     cbar=fig.colorbar(cf,label=labels[v])
     cbar.set_ticks(ticks[v][::2])
     cbar.set_ticklabels(ticklabels[v][::2])
     plt.tight_layout(rect=[0, 0, 1, 0.9])
     ctr+=1
-       
+    
+matplotlib.rcParams['font.size'] = 16
 #ws only
 for v in variables:
     fig=plt.figure(figsize=(16,8))
