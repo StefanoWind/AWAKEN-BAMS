@@ -226,9 +226,26 @@ for v in variables:
     cbar.set_ticklabels(ticklabels[v][::2])
     plt.tight_layout(rect=[0, 0, 1, 0.9])
     ctr+=1
-    
+  
+#special TKE figure
 matplotlib.rcParams['font.size'] = 16
-#ws only
+fig=plt.figure(figsize=(16,8))
+v='TKE log'
+ax=plt.subplot(2,2,4)
+cf=plt.contourf(hour_avg,ALL_avg['tot'].height,ALL_avg['tot'][v].T,ticks[v],cmap='coolwarm',extend='both')
+plt.contour(hour_avg,ALL_avg['tot'].height,ALL_avg['tot'][v].T,ticks[v],colors='k',linewidths=0.5,linestyles='solid',alpha=0.5)
+plt.ylabel(r'$z$ [m a.g.l.]')
+ax.set_xticks([0,6,12,18,24])
+plt.xlabel('Hour (UTC)')
+plt.xlim([0,24])
+plt.ylim([0,2000])
+# ax.set_yscale('symlog',linthresh=100)
+plt.colorbar(cf,label=labels[v],ticks=ticks[v][::4])
+plt.tight_layout()
+plt.grid()
+
+#month/direction
+matplotlib.rcParams['font.size'] = 16
 for v in variables:
     fig=plt.figure(figsize=(16,8))
     gs = gridspec.GridSpec(len(month_name), 3, width_ratios=[1,1,0.05])  # 0.1 row for the colorbars
