@@ -29,8 +29,8 @@ if len(sys.argv)==1:
 else:
     source_config=sys.argv[1]
     ws_lim=sys.argv[2]
-    wd_lim=sys.argv[2]
-    ti_lim=sys.argv[2]
+    wd_lim=sys.argv[3]
+    ti_lim=sys.argv[4]
 
 #fixed inputs
 source_log=os.path.join(cd,'data/glob.lidar.eventlog.avg.c2.20230101.000500.csv')#inflow table source
