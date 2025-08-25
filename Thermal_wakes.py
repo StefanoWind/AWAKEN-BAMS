@@ -15,6 +15,7 @@ from matplotlib import pyplot as plt
 import matplotlib
 import glob
 from scipy import stats
+from matplotlib.colors import LinearSegmentedColormap
 
 matplotlib.rcParams['font.family'] = 'serif'
 matplotlib.rcParams['mathtext.fontset'] = 'cm'
@@ -66,6 +67,7 @@ stab_class_uni=['S','U']
 
 #graphics
 colors={'North':(0,0.6,0,1),'Middle':(0.8,0.4,0,1)}
+cmap_wf = LinearSegmentedColormap.from_list("my_cmap", [(0.8,0.4,0,1),(0,0.6,0,1)])
 
 #%% Functions
 def nanmean_dataset(ds1, ds2):
@@ -237,7 +239,7 @@ for i_ws in range(len(ws_avg)):
         ax.set_yticklabels([])
         cax=plt.colorbar(cf,label=r'Temperature difference (G-C1a) [$^\circ$C]')
         cax.set_ticks(np.arange(-1,1.1,0.25))
-        plt.scatter(np.radians(wd_wakes),300+np.zeros(len(wd_wakes)),s=350,c=wake_factor,cmap='seismic',edgecolor='k',vmin=-50,vmax=50)
+        plt.scatter(np.radians(wd_wakes),300+np.zeros(len(wd_wakes)),s=350,c=(wake_factor+25)/41*255,cmap=cmap_wf,edgecolor='k',vmin=0,vmax=255)
         for i_wd in range(len(wd_wakes)):
             plt.text(np.radians(wd_wakes[i_wd]), 300, wake_factor[i_wd],
                      ha='center', va='center',color='w', fontsize=10, weight='bold',

@@ -17,6 +17,7 @@ matplotlib.rcParams['font.family'] = 'serif'
 matplotlib.rcParams['mathtext.fontset'] = 'cm'
 matplotlib.rcParams['font.size'] = 16
 matplotlib.rcParams['savefig.dpi'] = 500
+plt.close('all')
 
 #%% Inputs
 source_config=os.path.join(cd,'configs/config.yaml')
@@ -40,10 +41,10 @@ max_height=2000#[m] maixmum height
 bin_hour=np.arange(25)# bin in hour
 perc_lim=[5,95]#[%] outlier rejection
 p_value=0.05#p-value for confidence interval
-max_err={'temperature':4,'waterVapor':2,'dtheta_v_dz':0.01}#maximum 95% c.i. width
+max_err={'temperature':4,'waterVapor':2,'dtheta_v_dz':0.01,'pblh':0.1}#maximum 95% c.i. width
 
 #user
-variables=['temperature','waterVapor','dtheta_v_dz']
+variables=['temperature','waterVapor','dtheta_v_dz','pblh']
 
 #graphics
 labels={'temperature':r'$T$ [$^\circ$C]','waterVapor':r'$r$ [g Kg$^{-1}$]','dtheta_v_dz':r'$\frac{\partial{\theta_v}}{\partial z}$ [$^\circ$C m$^{-1}$]'}
@@ -76,6 +77,7 @@ if not os.path.isfile(save_path):
     #fix height
     Data=Data.assign_coords(height=Data.height*1000)
     
+    raise BaseException()
     #add lapse rate
     q=Data['waterVapor']/1000/(1+Data['waterVapor']/1000)
     Data['theta_v']=Data['theta']*(1+0.61*q)
@@ -85,6 +87,8 @@ if not os.path.isfile(save_path):
     Data.close()
 
 Data=xr.open_dataset(save_path)
+
+Data['pblh']=Data.pblh.where(Data.pblh>0.3)
 
 #data extraction
 height=Data.height.values
@@ -128,25 +132,28 @@ fig=plt.figure(figsize=(16,8))
 #plot T,r variables
 ctr=1
 for v in variables:
-    ax=fig.add_subplot(2,2,ctr)
-    cf=plt.contourf(hour_avg,Data_avg.height,Data_avg[v].T,ticks[v],cmap=colormaps[v],extend='both')
-    plt.contour(hour_avg,Data_avg.height,Data_avg[v].T,ticks[v],colors='k',linewidths=0.5,linestyles='solid',alpha=0.5)
-    if ctr==1 or ctr==3:
-        plt.ylabel(r'$z$ [m a.g.l.]')
-    else:
-        ax.set_yticklabels([])
-    ax.set_xticks([0,6,12,18,24])
-    if ctr>=3:
-        plt.xlabel('Hour (UTC)')
-    else:
-        ax.set_xticklabels([])
-    
-    plt.xlim([0,24])
-    plt.ylim([0,max_height])
-    plt.grid()
-    ctr+=1
-    # ax.set_yscale('symlog',linthresh=100)
-    plt.colorbar(cf,label=labels[v],ticks=ticks[v][::4])
+    if v!='pblh':
+        ax=fig.add_subplot(2,2,ctr)
+        cf=plt.contourf(hour_avg,Data_avg.height,Data_avg[v].T,ticks[v],cmap=colormaps[v],extend='both')
+        plt.contour(hour_avg,Data_avg.height,Data_avg[v].T,ticks[v],colors='k',linewidths=0.5,linestyles='solid',alpha=0.5)
+        if ctr==1:
+            pblh=Data_avg['pblh'].isel(height=0)*1000
+            plt.plot(hour_avg[hour_avg>=12],pblh[hour_avg>=12],'.w',markersize=20,markeredgecolor='k')
+        if ctr==1 or ctr==3:
+            plt.ylabel(r'$z$ [m a.g.l.]')
+        else:
+            ax.set_yticklabels([])
+        ax.set_xticks([0,6,12,18,24])
+        if ctr>=3:
+            plt.xlabel('Hour (UTC)')
+        else:
+            ax.set_xticklabels([])
+        
+        plt.xlim([0,24])
+        plt.ylim([0,max_height])
+        plt.grid()
+        ctr+=1
+        plt.colorbar(cf,label=labels[v],ticks=ticks[v][::4])
 plt.tight_layout()
 
 plt.figure()
