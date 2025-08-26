@@ -28,9 +28,9 @@ if len(sys.argv)==1:
     ti_lim=[0,15]#[deg]
 else:
     source_config=sys.argv[1]
-    ws_lim=[sys.argv[2],sys.argv[3]]
+    ws_lim=[np.float64(sys.argv[2]),np.float64(sys.argv[3])]
     wd_lim=sys.argv[4]
-    ti_lim=[sys.argv[5],sys.argv[6]]
+    ti_lim=[np.float64(sys.argv[5]),np.float64(sys.argv[6])]
 
 #fixed inputs
 source_log=os.path.join(cd,'data/glob.lidar.eventlog.avg.c2.20230101.000500.csv')#inflow table source
@@ -127,13 +127,14 @@ z_grid=(bin_z[:-1]+bin_z[1:])/2
 #%% Plots
 skip=int(len(Data.x)/max_plot)
 plt.figure(figsize=(18,4))
-plt.scatter(Data.x.values[::skip],Data.z.values[::skip],s=1,c=Data.u.values[::skip],cmap='coolwarm',vmin=0.5,vmax=2.5)
+plt.scatter(Data.x.values[::skip],Data.z.values[::skip],s=1,c=Data.u.values[::skip],cmap='coolwarm',vmin=0.5,vmax=2)
 ax=plt.gca()
 ax.set_aspect('equal')
 plt.xlim([-2000,8000])
 plt.grid()
 
 plt.figure(figsize=(18,4))
-plt.pcolor(x_grid,z_grid,u_avg.T,cmap='coolwarm',vmin=0.5,vmax=2.5)
+plt.pcolor(x_grid,z_grid,u_avg.T,cmap='coolwarm',vmin=0.5,vmax=2)
+ax=plt.gca()
 ax.set_aspect('equal')
 plt.grid()
