@@ -29,7 +29,7 @@ if len(sys.argv)==1:
 else:
     source_config=sys.argv[1]
     ws_lim=[np.float64(sys.argv[2]),np.float64(sys.argv[3])]
-    wd_lim=sys.argv[4]
+    wd_lim=np.float64(sys.argv[4])
     ti_lim=[np.float64(sys.argv[5]),np.float64(sys.argv[6])]
 
 #fixed inputs
