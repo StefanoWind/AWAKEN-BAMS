@@ -83,7 +83,7 @@ z=[]
 u=[]
 
 save_name=os.path.join(cd,'data',f'rhi.{ws_lim[0]}.{ws_lim[1]}.{wd_lim}.{ti_lim[0]}.{ti_lim[1]}.{llj_lim[0]}.{llj_lim[1]}.nc')
-os.makedirs(os.path.join(cd,'figures',os.path.basename(save_name)[:-2]),exist_ok=True)
+os.makedirs(os.path.join(cd,'figures',os.path.basename(save_name)[:-3]),exist_ok=True)
              
 #%% Main
 
