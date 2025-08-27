@@ -20,7 +20,7 @@ import warnings
 warnings.filterwarnings('ignore')
 matplotlib.rcParams['font.family'] = 'serif'
 matplotlib.rcParams['mathtext.fontset'] = 'cm'
-matplotlib.rcParams['font.size'] = 16
+matplotlib.rcParams['font.size'] = 12
 matplotlib.rcParams['savefig.dpi'] = 200
 
 #%% Inputs
@@ -40,7 +40,7 @@ else:
 #fixed inputs
 source_log=os.path.join(cd,'data/glob.lidar.eventlog.avg.c2.20230101.000500.csv')#inflow table source
 wd_ref=180#[deg]
-min_cos=0.3
+min_cos=1/3
 scan_duration=600#[s]
 
 #stats
@@ -50,8 +50,8 @@ dx=100#[m]
 dz=50#[m]
 max_err_u=0.1
 min_N=100
-min_u=0.3
-max_u=3
+min_u=0.1
+max_u=1.5
 ele_corr=2
 
 #graphics
@@ -193,6 +193,9 @@ interpolated_values1 = sp.interpolate.griddata(points1, values1, interp_points1,
 u_avg_inp = u_avg.copy()
 u_avg_inp[interp_mask1] = interpolated_values1
 
+#LLJ height
+LLJ_nose=z_grid[np.argmax(u_avg_inp,axis=1)]
+
 #%% Plots
 plt.close('all')
 skip=int(len(Data.x)/max_plot)
@@ -200,17 +203,17 @@ plt.figure(figsize=(18,4))
 plt.scatter(Data.x.values[::skip],Data.z.values[::skip],s=1,c=Data.u.values[::skip],cmap='coolwarm',vmin=0.25,vmax=1)
 ax=plt.gca()
 ax.set_aspect('equal')
-plt.xlim([-2000,8000])
-plt.ylim([0,1250])
+plt.xlim([-1800,7800])
+plt.ylim([0,1000])
 plt.grid()
 
 plt.figure(figsize=(18,4))
-cf=plt.contourf(x_grid,z_grid,u_avg.T,np.arange(0.25,1.01,0.1),cmap='coolwarm',extend='both')
-plt.contour(x_grid,z_grid,u_avg.T,np.arange(0.25,1.01,0.1),extend='both',linewidths=1,alpha=0.25,colors='k')
+cf=plt.contourf(x_grid,z_grid,u_avg.T,np.arange(0.25,1.01,0.05),cmap='coolwarm',extend='both')
+plt.contour(x_grid,z_grid,u_avg.T,np.arange(0.25,1.01,0.05),extend='both',linewidths=1,alpha=0.25,colors='k')
 ax=plt.gca()
 ax.set_aspect('equal')
-plt.xlim([-2000,8000])
-plt.ylim([0,1250])
+plt.xlim([-1800,7800])
+plt.ylim([0,1000])
 plt.grid()
 plt.xlabel(r'$x$ [m]')
 plt.ylabel(r'$y$ [m]')
@@ -218,12 +221,15 @@ plt.grid()
 plt.colorbar(cf,label='$u/U_\infty$ [m s$^{-1}$]')
 
 plt.figure(figsize=(18,4))
-cf=plt.contourf(x_grid,z_grid,u_avg_inp.T,np.arange(0.25,1.01,0.05),cmap='coolwarm',extend='both')
-plt.contour(x_grid,z_grid,u_avg_inp.T,np.arange(0.25,1.01,0.05),extend='both',linewidths=1,alpha=0.25,colors='k')
+cf=plt.contourf(x_grid,z_grid,u_avg_inp.T,np.arange(0.5,0.91,0.05),cmap='coolwarm',extend='both')
+plt.contour(x_grid,z_grid,u_avg_inp.T,np.arange(0.5,0.91,0.05),extend='both',linewidths=1,alpha=0.25,colors='k')
+for s in config['source_rhi']:
+    plt.plot([config['turbine_x'][s],config['turbine_x'][s]],[0,127/2],'k',linewidth=3)
+plt.plot(x_grid,LLJ_nose,'.k',markersize=10,markerfacecolor='w')
 ax=plt.gca()
 ax.set_aspect('equal')
-plt.xlim([-2000,8000])
-plt.ylim([0,1250])
+plt.xlim([-1800,7800])
+plt.ylim([0,1000])
 plt.grid()
 plt.xlabel(r'$x$ [m]')
 plt.ylabel(r'$y$ [m]')
