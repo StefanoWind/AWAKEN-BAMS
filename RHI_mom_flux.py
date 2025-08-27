@@ -25,10 +25,10 @@ matplotlib.rcParams['savefig.dpi'] = 200
 #%% Inputs
 if len(sys.argv)==1:
     source_config=os.path.join(cd,'configs/config.yaml')
-    ws_lim=[4.0,11.0]#m/s
-    wd_lim=180.0#[deg]
-    ti_lim=[0.0,52.0]#[deg]
-    llj_lim=[200.0,300.0]
+    ws_lim=[4.0,12.0]#m/s
+    wd_lim=10.0#[deg]
+    ti_lim=[0.0,10.0]#[deg]
+    llj_lim=[200.0,400.0]
 else:
     source_config=sys.argv[1]
     ws_lim=[np.float64(sys.argv[2]),np.float64(sys.argv[3])]
@@ -82,7 +82,7 @@ x=[]
 z=[]
 u=[]
 
-save_name=os.path.join(cd,'data',f'rhi.{ws_lim[0]}.{ws_lim[1]}.{wd_lim}.{ti_lim[0]}.{ti_lim[1]}.nc')
+save_name=os.path.join(cd,'data',f'rhi.{ws_lim[0]}.{ws_lim[1]}.{wd_lim}.{ti_lim[0]}.{ti_lim[1]}.{llj_lim[0]}.{llj_lim[1]}.nc')
 os.makedirs(os.path.join(cd,'figures',os.path.basename(save_name)[:-2]),exist_ok=True)
              
 #%% Main
@@ -114,7 +114,7 @@ if not os.path.isfile(save_name):
             
             files_sel=files[sel_ws*sel_wd*sel_ti*sel_llj]
             
-            print(f'{len(files_sel)} scans selected')
+            print(f'{len(files_sel)} scans selected in {s}', flush=True)
             
             for f in files_sel:
                 Data=xr.open_mfdataset(f)
@@ -129,7 +129,7 @@ if not os.path.isfile(save_name):
                 
                 
                 plt.figure(figsize=(18,4))
-                plt.scatter(Data.x.values[real]+config['turbine_x'][s],Data.z.values[real],s=1,c=u_eq.values[real],cmap='coolwarm',vmin=0,vmax=1)
+                plt.scatter(Data.x.values[real]+config['turbine_x'][s],Data.z.values[real],s=1,c=u_eq.values[real],cmap='coolwarm',vmin=0.5,vmax=2)
                 plt.title(os.path.basename(f))
                 ax=plt.gca()
                 ax.set_aspect('equal')
@@ -140,7 +140,7 @@ if not os.path.isfile(save_name):
                 plt.grid()
                 plt.colorbar(label='$u/U_\infty$ [m s$^{-1}$]')
                 
-                plt.savefig(os.path.join(cd,'figures',os.path.basename(save_name)[:-2],os.path.basename(f).replace('nc','png')))
+                plt.savefig(os.path.join(cd,'figures',os.path.basename(save_name)[:-3],os.path.basename(f).replace('nc','png')))
                 plt.close()
                 
     #output
