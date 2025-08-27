@@ -27,17 +27,20 @@ if len(sys.argv)==1:
     source_config=os.path.join(cd,'configs/config.yaml')
     ws_lim=[4.0,11.0]#m/s
     wd_lim=180.0#[deg]
-    ti_lim=[0.0,50.0]#[deg]
+    ti_lim=[0.0,52.0]#[deg]
+    llj_lim=[200.0,300.0]
 else:
     source_config=sys.argv[1]
     ws_lim=[np.float64(sys.argv[2]),np.float64(sys.argv[3])]
     wd_lim=np.float64(sys.argv[4])
     ti_lim=[np.float64(sys.argv[5]),np.float64(sys.argv[6])]
+    llj_lim=[np.float64(sys.argv[7]),np.float64(sys.argv[8])]
 
 #fixed inputs
 source_log=os.path.join(cd,'data/glob.lidar.eventlog.avg.c2.20230101.000500.csv')#inflow table source
 wd_ref=180#[deg]
 min_cos=0.3
+scan_duration=600#[s]
 
 #stats
 perc_lim=[5,95]#[%] percentile limits
@@ -89,7 +92,7 @@ if not os.path.isfile(save_name):
         files=np.array(sorted(glob.glob(config['source_rhi'][s])))
         if len(files)>0:
             time_files=dates_from_files(files)
-            time_files+=np.median(np.diff(time_files))/2
+            time_files+=np.timedelta64(scan_duration,'s')/2
             
             #inflow extraction
             ws_int=inflow['Hub-height wind speed [m/s]'].interp(time=time_files)
@@ -97,6 +100,7 @@ if not os.path.isfile(save_name):
             sin=np.sin(np.radians(inflow['Hub-height wind direction [degrees]'])).interp(time=time_files)
             wd_int=np.degrees(np.arctan2(sin,cos))%360
             ti_int=inflow['Rotor-averaged TI [%]'].interp(time=time_files)
+            llj_int=inflow['Nose height [m]'].interp(time=time_files)
             
             #file selection
             sel_ws=(ws_int>=ws_lim[0])*(ws_int<ws_lim[1])
@@ -106,7 +110,11 @@ if not os.path.isfile(save_name):
            
             sel_ti=(ti_int>=ti_lim[0])*(ti_int<ti_lim[1])
             
-            files_sel=files[sel_ws*sel_wd*sel_ti]
+            sel_llj=(llj_int>=llj_lim[0])*(llj_int<llj_lim[1])
+            
+            files_sel=files[sel_ws*sel_wd*sel_ti*sel_llj]
+            
+            print(f'{len(files_sel)} scans selected')
             
             for f in files_sel:
                 Data=xr.open_mfdataset(f)
@@ -121,7 +129,7 @@ if not os.path.isfile(save_name):
                 
                 
                 plt.figure(figsize=(18,4))
-                plt.scatter(Data.x.values[real]+config['turbine_x'][s],Data.z.values[real],s=1,c=u_eq.values[real],cmap='coolwarm',vmin=0.5,vmax=2)
+                plt.scatter(Data.x.values[real]+config['turbine_x'][s],Data.z.values[real],s=1,c=u_eq.values[real],cmap='coolwarm',vmin=0,vmax=1)
                 plt.title(os.path.basename(f))
                 ax=plt.gca()
                 ax.set_aspect('equal')
@@ -130,7 +138,7 @@ if not os.path.isfile(save_name):
                 plt.xlabel(r'$x$ [m]')
                 plt.ylabel(r'$y$ [m]')
                 plt.grid()
-                plt.colorbar(label='$u/U_\infty$ [m s${^-1}$]')
+                plt.colorbar(label='$u/U_\infty$ [m s$^{-1}$]')
                 
                 plt.savefig(os.path.join(cd,'figures',os.path.basename(save_name)[:-2],os.path.basename(f).replace('nc','png')))
                 plt.close()
