@@ -26,7 +26,7 @@ matplotlib.rcParams['savefig.dpi'] = 200
 #%% Inputs
 if len(sys.argv)==1:
     source_config=os.path.join(cd,'configs/config.yaml')
-    ws_lim=[5.0,15.0]#m/s
+    ws_lim=[10.0,30.0]#m/s
     wd_lim=20.0#[deg]
     ti_lim=[0.0,10.0]#[deg]
     llj_lim=[300.0,500.0]
@@ -42,6 +42,7 @@ source_log=os.path.join(cd,'data/glob.lidar.eventlog.avg.c2.20230101.000500.csv'
 wd_ref=180#[deg]
 min_cos=0.3
 scan_duration=600#[s]
+ele_corr=2
 
 #stats
 perc_lim=[5,95]#[%] percentile limits
@@ -133,13 +134,12 @@ if not os.path.isfile(save_name):
                 x=np.append(x,Data.x.values[real]+config['turbine_x'][s])
                 z=np.append(z,Data.z.values[real])
                 
-                u_eq=-Data.wind_speed/np.cos(np.radians(Data.elevation))/((ws_int1[files==f]+ws_int2[files==f])/2)
+                u_eq=-Data.wind_speed/np.cos(np.radians(Data.elevation+ele_corr))/((ws_int1[files==f]+ws_int2[files==f])/2)
                 
                 u=np.append(u,u_eq.values[real])
                 
-                
+                #plot
                 plt.figure(figsize=(18,4))
-                plt.scatter(Data.x.values[real]+config['turbine_x'][s],Data.z.values[real],s=1,c=u_eq.values[real],cmap='coolwarm',vmin=0.5,vmax=2)
                 plt.title(os.path.basename(f))
                 ax=plt.gca()
                 ax.set_aspect('equal')
@@ -196,7 +196,7 @@ u_avg_inp[interp_mask1] = interpolated_values1
 plt.close('all')
 skip=int(len(Data.x)/max_plot)
 plt.figure(figsize=(18,4))
-plt.scatter(Data.x.values[::skip],Data.z.values[::skip],s=1,c=Data.u.values[::skip],cmap='coolwarm',vmin=0.5,vmax=2)
+plt.scatter(Data.x.values[::skip],Data.z.values[::skip],s=1,c=Data.u.values[::skip],cmap='coolwarm',vmin=0.25,vmax=1)
 ax=plt.gca()
 ax.set_aspect('equal')
 plt.xlim([-2000,8000])
@@ -204,8 +204,8 @@ plt.ylim([0,1250])
 plt.grid()
 
 plt.figure(figsize=(18,4))
-cf=plt.contourf(x_grid,z_grid,u_avg.T,np.arange(0.6,2.1,0.1),cmap='coolwarm',extend='both')
-plt.contour(x_grid,z_grid,u_avg.T,np.arange(0.6,2.1,0.1),extend='both',linewidths=1,alpha=0.25,colors='k')
+cf=plt.contourf(x_grid,z_grid,u_avg.T,np.arange(0.25,1.01,0.1),cmap='coolwarm',extend='both')
+plt.contour(x_grid,z_grid,u_avg.T,np.arange(0.25,1.01,0.1),extend='both',linewidths=1,alpha=0.25,colors='k')
 ax=plt.gca()
 ax.set_aspect('equal')
 plt.xlim([-2000,8000])
@@ -217,8 +217,8 @@ plt.grid()
 plt.colorbar(cf,label='$u/U_\infty$ [m s$^{-1}$]')
 
 plt.figure(figsize=(18,4))
-cf=plt.contourf(x_grid,z_grid,u_avg_inp.T,np.arange(0.6,2.1,0.1),cmap='coolwarm',extend='both')
-plt.contour(x_grid,z_grid,u_avg_inp.T,np.arange(0.6,2.1,0.1),extend='both',linewidths=1,alpha=0.25,colors='k')
+cf=plt.contourf(x_grid,z_grid,u_avg_inp.T,np.arange(0.25,1.01,0.05),cmap='coolwarm',extend='both')
+plt.contour(x_grid,z_grid,u_avg_inp.T,np.arange(0.25,1.01,0.05),extend='both',linewidths=1,alpha=0.25,colors='k')
 ax=plt.gca()
 ax.set_aspect('equal')
 plt.xlim([-2000,8000])
