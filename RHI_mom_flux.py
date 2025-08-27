@@ -11,6 +11,7 @@ import pandas as pd
 import xarray as xr
 from matplotlib import pyplot as plt
 import matplotlib
+import scipy as sp
 import yaml
 import re
 import glob
@@ -25,10 +26,10 @@ matplotlib.rcParams['savefig.dpi'] = 200
 #%% Inputs
 if len(sys.argv)==1:
     source_config=os.path.join(cd,'configs/config.yaml')
-    ws_lim=[4.0,12.0]#m/s
-    wd_lim=180.0#[deg]
-    ti_lim=[0.0,40.0]#[deg]
-    llj_lim=[200.0,400.0]
+    ws_lim=[5.0,15.0]#m/s
+    wd_lim=20.0#[deg]
+    ti_lim=[0.0,10.0]#[deg]
+    llj_lim=[300.0,500.0]
 else:
     source_config=sys.argv[1]
     ws_lim=[np.float64(sys.argv[2]),np.float64(sys.argv[3])]
@@ -48,7 +49,7 @@ p_value=0.05#p-value for c.i.
 dx=100#[m]
 dz=50#[m]
 max_err_u=0.1
-min_N=30
+min_N=100
 min_u=0.3
 max_u=3
 
@@ -94,8 +95,8 @@ if not os.path.isfile(save_name):
             time_files=dates_from_files(files)
             
             #inflow extraction
-            ws_int1=inflow['Hub-height wind speed [m/s]'].interp(time=time_files).values
-            ws_int2=inflow['Hub-height wind speed [m/s]'].interp(time=time_files+np.timedelta64(scan_duration,'s')).values
+            ws_int1=inflow['Nose wind speed [m/s]'].interp(time=time_files).values
+            ws_int2=inflow['Nose wind speed [m/s]'].interp(time=time_files+np.timedelta64(scan_duration,'s')).values
             
             cos1=np.cos(np.radians(inflow['Hub-height wind direction [degrees]'])).interp(time=time_files).values
             sin1=np.sin(np.radians(inflow['Hub-height wind direction [degrees]'])).interp(time=time_files).values
@@ -178,6 +179,19 @@ u_avg[u_top-u_low>max_err_u]=np.nan
 x_grid=(bin_x[:-1]+bin_x[1:])/2
 z_grid=(bin_z[:-1]+bin_z[1:])/2
 
+#inpainting
+interp_limit = 5
+valid_mask1 = ~np.isnan(u_avg)
+distance1 = sp.ndimage.distance_transform_edt(~valid_mask1)
+interp_mask1 = (np.isnan(u_avg)) & (distance1 <= interp_limit)
+yy1, xx1 = np.indices(u_avg.shape)
+points1 = np.column_stack((yy1[valid_mask1], xx1[valid_mask1]))
+values1 = u_avg[valid_mask1]
+interp_points1 = np.column_stack((yy1[interp_mask1], xx1[interp_mask1]))
+interpolated_values1 = sp.interpolate.griddata(points1, values1, interp_points1, method='linear')
+u_avg_inp = u_avg.copy()
+u_avg_inp[interp_mask1] = interpolated_values1
+
 #%% Plots
 plt.close('all')
 skip=int(len(Data.x)/max_plot)
@@ -190,9 +204,27 @@ plt.ylim([0,1250])
 plt.grid()
 
 plt.figure(figsize=(18,4))
-plt.pcolor(x_grid,z_grid,u_low.T,cmap='coolwarm',vmin=0.5,vmax=2)
+cf=plt.contourf(x_grid,z_grid,u_avg.T,np.arange(0.6,2.1,0.1),cmap='coolwarm',extend='both')
+plt.contour(x_grid,z_grid,u_avg.T,np.arange(0.6,2.1,0.1),extend='both',linewidths=1,alpha=0.25,colors='k')
 ax=plt.gca()
 ax.set_aspect('equal')
 plt.xlim([-2000,8000])
 plt.ylim([0,1250])
 plt.grid()
+plt.xlabel(r'$x$ [m]')
+plt.ylabel(r'$y$ [m]')
+plt.grid()
+plt.colorbar(cf,label='$u/U_\infty$ [m s$^{-1}$]')
+
+plt.figure(figsize=(18,4))
+cf=plt.contourf(x_grid,z_grid,u_avg_inp.T,np.arange(0.6,2.1,0.1),cmap='coolwarm',extend='both')
+plt.contour(x_grid,z_grid,u_avg_inp.T,np.arange(0.6,2.1,0.1),extend='both',linewidths=1,alpha=0.25,colors='k')
+ax=plt.gca()
+ax.set_aspect('equal')
+plt.xlim([-2000,8000])
+plt.ylim([0,1250])
+plt.grid()
+plt.xlabel(r'$x$ [m]')
+plt.ylabel(r'$y$ [m]')
+plt.grid()
+plt.colorbar(cf,label='$u/U_\infty$ [m s$^{-1}$]')
