@@ -132,7 +132,7 @@ if not os.path.isfile(save_name):
                 x=np.append(x,Data.x.values[real]+config['turbine_x'][s])
                 z=np.append(z,Data.z.values[real])
                 
-                u_eq=-Data.wind_speed/np.cos(np.radians(Data.elevation))/(ws_int1.values[files==f]+ws_int2.values[files==f])
+                u_eq=-Data.wind_speed/np.cos(np.radians(Data.elevation))/(ws_int1[files==f]+ws_int2[files==f])
                 
                 u=np.append(u,u_eq.values[real])
                 
