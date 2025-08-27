@@ -42,7 +42,6 @@ source_log=os.path.join(cd,'data/glob.lidar.eventlog.avg.c2.20230101.000500.csv'
 wd_ref=180#[deg]
 min_cos=0.3
 scan_duration=600#[s]
-ele_corr=2
 
 #stats
 perc_lim=[5,95]#[%] percentile limits
@@ -53,6 +52,7 @@ max_err_u=0.1
 min_N=100
 min_u=0.3
 max_u=3
+ele_corr=2
 
 #graphics
 max_plot=1000000
@@ -138,8 +138,9 @@ if not os.path.isfile(save_name):
                 
                 u=np.append(u,u_eq.values[real])
                 
-                #plot
+                #plots
                 plt.figure(figsize=(18,4))
+                plt.scatter(Data.x.values[real]+config['turbine_x'][s],Data.z.values[real],s=1,c=u_eq.values[real],cmap='coolwarm',vmin=0.25,vmax=1)
                 plt.title(os.path.basename(f))
                 ax=plt.gca()
                 ax.set_aspect('equal')
