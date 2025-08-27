@@ -26,9 +26,9 @@ matplotlib.rcParams['savefig.dpi'] = 200
 if len(sys.argv)==1:
     source_config=os.path.join(cd,'configs/config.yaml')
     ws_lim=[4.0,12.0]#m/s
-    wd_lim=10.0#[deg]
-    ti_lim=[0.0,10.0]#[deg]
-    llj_lim=[200.0,400.0]
+    wd_lim=20.0#[deg]
+    ti_lim=[0.0,41.0]#[deg]
+    llj_lim=[300.0,400.0]
 else:
     source_config=sys.argv[1]
     ws_lim=[np.float64(sys.argv[2]),np.float64(sys.argv[3])]
@@ -92,25 +92,34 @@ if not os.path.isfile(save_name):
         files=np.array(sorted(glob.glob(config['source_rhi'][s])))
         if len(files)>0:
             time_files=dates_from_files(files)
-            time_files+=np.timedelta64(scan_duration,'s')/2
             
             #inflow extraction
-            ws_int=inflow['Hub-height wind speed [m/s]'].interp(time=time_files)
-            cos=np.cos(np.radians(inflow['Hub-height wind direction [degrees]'])).interp(time=time_files)
-            sin=np.sin(np.radians(inflow['Hub-height wind direction [degrees]'])).interp(time=time_files)
-            wd_int=np.degrees(np.arctan2(sin,cos))%360
-            ti_int=inflow['Rotor-averaged TI [%]'].interp(time=time_files)
-            llj_int=inflow['Nose height [m]'].interp(time=time_files)
+            ws_int1=inflow['Hub-height wind speed [m/s]'].interp(time=time_files)
+            ws_int2=inflow['Hub-height wind speed [m/s]'].interp(time=time_files+np.timedelta64(scan_duration,'s'))
+            
+            cos1=np.cos(np.radians(inflow['Hub-height wind direction [degrees]'])).interp(time=time_files)
+            sin1=np.sin(np.radians(inflow['Hub-height wind direction [degrees]'])).interp(time=time_files)
+            wd_int1=np.degrees(np.arctan2(sin1,cos1))%360
+            cos2=np.cos(np.radians(inflow['Hub-height wind direction [degrees]'])).interp(time=time_files+np.timedelta64(scan_duration,'s'))
+            sin2=np.sin(np.radians(inflow['Hub-height wind direction [degrees]'])).interp(time=time_files+np.timedelta64(scan_duration,'s'))
+            wd_int2=np.degrees(np.arctan2(sin2,cos2))%360
+            
+            ti_int1=inflow['Rotor-averaged TI [%]'].interp(time=time_files)
+            ti_int2=inflow['Rotor-averaged TI [%]'].interp(time=time_files+np.timedelta64(scan_duration,'s'))
+            
+            llj_int1=inflow['Nose height [m]'].interp(time=time_files)
+            llj_int2=inflow['Nose height [m]'].interp(time=time_files+np.timedelta64(scan_duration,'s'))
             
             #file selection
-            sel_ws=(ws_int>=ws_lim[0])*(ws_int<ws_lim[1])
+            sel_ws=(ws_int1>=ws_lim[0])*(ws_int1<ws_lim[1])*(ws_int2>=ws_lim[0])*(ws_int2<ws_lim[1])
             
-            wd_diff=(wd_int - wd_ref + 180) % 360 - 180
-            sel_wd=np.abs(wd_diff)<wd_lim
+            wd_diff1=(wd_int1 - wd_ref + 180) % 360 - 180
+            wd_diff2=(wd_int2 - wd_ref + 180) % 360 - 180
+            sel_wd=(np.abs(wd_diff1)<wd_lim)*(np.abs(wd_diff2)<wd_lim)
            
-            sel_ti=(ti_int>=ti_lim[0])*(ti_int<ti_lim[1])
+            sel_ti=(ti_int1>=ti_lim[0])*(ti_int1<ti_lim[1])*(ti_int2>=ti_lim[0])*(ti_int2<ti_lim[1])
             
-            sel_llj=(llj_int>=llj_lim[0])*(llj_int<llj_lim[1])
+            sel_llj=(llj_int1>=llj_lim[0])*(llj_int1<llj_lim[1])*(llj_int2>=llj_lim[0])*(llj_int2<llj_lim[1])
             
             files_sel=files[sel_ws*sel_wd*sel_ti*sel_llj]
             
@@ -123,7 +132,7 @@ if not os.path.isfile(save_name):
                 x=np.append(x,Data.x.values[real]+config['turbine_x'][s])
                 z=np.append(z,Data.z.values[real])
                 
-                u_eq=-Data.wind_speed/np.cos(np.radians(Data.elevation))/ws_int.values[files==f]
+                u_eq=-Data.wind_speed/np.cos(np.radians(Data.elevation))/(ws_int1.values[files==f]+ws_int2.values[files==f])
                 
                 u=np.append(u,u_eq.values[real])
                 
