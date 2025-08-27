@@ -4,6 +4,7 @@ RHI processing
 """
 import os
 cd=os.path.dirname(__file__)
+import utils as utl
 import sys
 import numpy as np
 import pandas as pd
@@ -19,13 +20,14 @@ warnings.filterwarnings('ignore')
 matplotlib.rcParams['font.family'] = 'serif'
 matplotlib.rcParams['mathtext.fontset'] = 'cm'
 matplotlib.rcParams['font.size'] = 16
-matplotlib.rcParams['savefig.dpi'] = 500
+matplotlib.rcParams['savefig.dpi'] = 200
+
 #%% Inputs
 if len(sys.argv)==1:
     source_config=os.path.join(cd,'configs/config.yaml')
-    ws_lim=[4,11]#m/s
-    wd_lim=180#[deg]
-    ti_lim=[0,15]#[deg]
+    ws_lim=[4.0,11.0]#m/s
+    wd_lim=180.0#[deg]
+    ti_lim=[0.0,50.0]#[deg]
 else:
     source_config=sys.argv[1]
     ws_lim=[np.float64(sys.argv[2]),np.float64(sys.argv[3])]
@@ -36,9 +38,19 @@ else:
 source_log=os.path.join(cd,'data/glob.lidar.eventlog.avg.c2.20230101.000500.csv')#inflow table source
 wd_ref=180#[deg]
 min_cos=0.3
-dx=200#[m]
+
+#stats
+perc_lim=[5,95]#[%] percentile limits
+p_value=0.05#p-value for c.i.
+dx=100#[m]
 dz=50#[m]
-max_plot=10000
+max_err_u=0.1
+min_N=30
+min_u=0.3
+max_u=3
+
+#graphics
+max_plot=1000000
 
 #%% Functions
 def dates_from_files(files):
@@ -67,8 +79,9 @@ x=[]
 z=[]
 u=[]
 
-save_name=os.path.join(cd,f'rhi.{ws_lim[0]}.{ws_lim[1]}.{wd_lim}.{ti_lim[0]}.{ti_lim[1]}.nc')
-
+save_name=os.path.join(cd,'data',f'rhi.{ws_lim[0]}.{ws_lim[1]}.{wd_lim}.{ti_lim[0]}.{ti_lim[1]}.nc')
+os.makedirs(os.path.join(cd,'figures',os.path.basename(save_name)[:-2]),exist_ok=True)
+             
 #%% Main
 
 if not os.path.isfile(save_name):
@@ -106,6 +119,22 @@ if not os.path.isfile(save_name):
                 
                 u=np.append(u,u_eq.values[real])
                 
+                
+                plt.figure(figsize=(18,4))
+                plt.scatter(Data.x.values[real]+config['turbine_x'][s],Data.z.values[real],s=1,c=u_eq.values[real],cmap='coolwarm',vmin=0.5,vmax=2)
+                plt.title(os.path.basename(f))
+                ax=plt.gca()
+                ax.set_aspect('equal')
+                plt.xlim([-2000,8000])
+                plt.ylim([0,1250])
+                plt.xlabel(r'$x$ [m]')
+                plt.ylabel(r'$y$ [m]')
+                plt.grid()
+                plt.colorbar(label='$u/U_\infty$ [m s${^-1}$]')
+                
+                plt.savefig(os.path.join(cd,'figures',os.path.basename(save_name)[:-2],os.path.basename(f).replace('nc','png')))
+                plt.close()
+                
     #output
     Output=xr.Dataset()
     Output['x']=xr.DataArray(x,coords={'index':np.arange(len(x))})
@@ -114,27 +143,39 @@ if not os.path.isfile(save_name):
     Output.to_netcdf(save_name)
     Output.close()
 
+#load data
 Data=xr.open_dataset(save_name)
-
+Data=Data.where((Data.u>=min_u)*(Data.u<=max_u))
 #stats
 bin_x=np.arange(-2000,8000,dx)
-bin_z=np.arange(0,1000,dz)
-u_avg=stats.binned_statistic_2d(Data.x.values,Data.z.values,Data.u.values,statistic='median',bins=[bin_x,bin_z])[0]
+bin_z=np.arange(0,1250,dz)
+u_avg=stats.binned_statistic_2d(Data.x.values,Data.z.values,Data.u.values,
+                                statistic=lambda x: utl.filt_stat(x,   np.nanmean,perc_lim=perc_lim),bins=[bin_x,bin_z])[0]
+u_low=stats.binned_statistic_2d(Data.x.values,Data.z.values,Data.u.values,
+                                statistic=lambda x: utl.filt_BS_stat(x,np.nanmean,perc_lim=perc_lim,p_value=p_value/2*100,min_N=min_N),bins=[bin_x,bin_z])[0]
+u_top=stats.binned_statistic_2d(Data.x.values,Data.z.values,Data.u.values,
+                                statistic=lambda x: utl.filt_BS_stat(x,np.nanmean,perc_lim=perc_lim,p_value=(1-p_value/2)*100,min_N=min_N),bins=[bin_x,bin_z])[0]
+
+u_avg[u_top-u_low>max_err_u]=np.nan
 
 x_grid=(bin_x[:-1]+bin_x[1:])/2
 z_grid=(bin_z[:-1]+bin_z[1:])/2
 
 #%% Plots
+plt.close('all')
 skip=int(len(Data.x)/max_plot)
 plt.figure(figsize=(18,4))
 plt.scatter(Data.x.values[::skip],Data.z.values[::skip],s=1,c=Data.u.values[::skip],cmap='coolwarm',vmin=0.5,vmax=2)
 ax=plt.gca()
 ax.set_aspect('equal')
 plt.xlim([-2000,8000])
+plt.ylim([0,1250])
 plt.grid()
 
 plt.figure(figsize=(18,4))
-plt.pcolor(x_grid,z_grid,u_avg.T,cmap='coolwarm',vmin=0.5,vmax=2)
+plt.pcolor(x_grid,z_grid,u_low.T,cmap='coolwarm',vmin=0.5,vmax=2)
 ax=plt.gca()
 ax.set_aspect('equal')
+plt.xlim([-2000,8000])
+plt.ylim([0,1250])
 plt.grid()
