@@ -27,7 +27,7 @@ matplotlib.rcParams['savefig.dpi'] = 200
 if len(sys.argv)==1:
     source_config=os.path.join(cd,'configs/config.yaml')
     ws_lim=[10.0,30.0]#m/s
-    wd_lim=20.0#[deg]
+    wd_lim=180.0#[deg]
     ti_lim=[0.0,10.0]#[deg]
     llj_lim=[300.0,500.0]
 else:
@@ -42,6 +42,8 @@ source_log=os.path.join(cd,'data/glob.lidar.eventlog.avg.c2.20230101.000500.csv'
 wd_ref=180#[deg]
 min_cos=1/3
 scan_duration=600#[s]
+inflow_site='A1'
+outflow_site='H'
 
 #stats
 perc_lim=[5,95]#[%] percentile limits
@@ -83,6 +85,8 @@ inflow=xr.Dataset.from_dataframe(inflow_df).rename({'UTC Time':'time'})
 x=[]
 z=[]
 u=[]
+uw_inflow=[]
+uw_outflow=[]
 
 save_name=os.path.join(cd,'data',f'rhi.{ws_lim[0]}.{ws_lim[1]}.{wd_lim}.{ti_lim[0]}.{ti_lim[1]}.{llj_lim[0]}.{llj_lim[1]}.nc')
 os.makedirs(os.path.join(cd,'figures',os.path.basename(save_name)[:-3]),exist_ok=True)
@@ -128,7 +132,8 @@ if not os.path.isfile(save_name):
             print(f'{len(files_sel)} scans selected in {s}', flush=True)
             
             for f in files_sel:
-                Data=xr.open_mfdataset(f)
+                Data=xr.open_dataset(f)
+                time_avg=(Data.time.isel(scanID=0,beamID=0)+(Data.time.isel(scanID=-1,beamID=-1)-Data.time.isel(scanID=0,beamID=0))/2).values
                 Data=Data.where(Data.qc_wind_speed==0).where(np.abs(np.cos(np.radians(Data.elevation)))>min_cos)
                 real=~np.isnan(Data.x+Data.z+Data.wind_speed).values
                 x=np.append(x,Data.x.values[real]+config['turbine_x'][s])
@@ -138,9 +143,33 @@ if not os.path.isfile(save_name):
                 
                 u=np.append(u,u_eq.values[real])
                 
+                #mom flux
+                date=os.path.basename(f).split('.')[4]
+                file_inflow=glob.glob(os.path.join(config['source_prof'][inflow_site],f'*{date}*nc'))
+                if len(file_inflow)==1:
+                    Data_inflow=xr.open_dataset(file_inflow[0])
+                    uw_inflow_int=Data_inflow.uw.interp(time=time_avg)
+                    if len(uw_inflow)==0:
+                        uw_inflow=uw_inflow_int.values
+                    else:
+                        uw_inflow=np.vstack([uw_inflow,uw_inflow_int.values])
+                    
+                file_outflow=glob.glob(os.path.join(config['source_prof'][outflow_site],f'*{date}*nc'))
+                if len(file_outflow)==1:
+                    Data_outflow=xr.open_dataset(file_outflow[0])
+                    uw_outflow_int=Data_outflow.uw.interp(time=time_avg)
+                    if len(uw_outflow)==0:
+                        uw_outflow=uw_outflow_int.values
+                    else:
+                        uw_outflow=np.vstack([uw_outflow,uw_outflow_int.values])
+                
                 #plots
                 plt.figure(figsize=(18,4))
                 plt.scatter(Data.x.values[real]+config['turbine_x'][s],Data.z.values[real],s=1,c=u_eq.values[real],cmap='coolwarm',vmin=0.25,vmax=1)
+                plt.plot(config['inflow_x']+uw_inflow_int.height*0,uw_inflow_int.height,'--k')
+                plt.plot(config['inflow_x']+uw_inflow_int*10000,uw_inflow_int.height,'g')
+                plt.plot(config['outflow_x']+uw_outflow_int.height*0,uw_outflow_int.height,'--k')
+                plt.plot(config['outflow_x']+uw_outflow_int*10000,uw_outflow_int.height,'g')
                 plt.title(os.path.basename(f))
                 ax=plt.gca()
                 ax.set_aspect('equal')
@@ -165,6 +194,7 @@ if not os.path.isfile(save_name):
 #load data
 Data=xr.open_dataset(save_name)
 Data=Data.where((Data.u>=min_u)*(Data.u<=max_u))
+
 #stats
 bin_x=np.arange(-2000,8000,dx)
 bin_z=np.arange(0,1250,dz)
@@ -179,6 +209,9 @@ u_avg[u_top-u_low>max_err_u]=np.nan
 
 x_grid=(bin_x[:-1]+bin_x[1:])/2
 z_grid=(bin_z[:-1]+bin_z[1:])/2
+
+uw_inflow_avg= np.apply_along_axis(lambda x: utl.filt_stat(x,   np.nanmean,perc_lim=perc_lim), axis=0, arr=uw_inflow)
+uw_outflow_avg= np.apply_along_axis(lambda x: utl.filt_stat(x,   np.nanmean,perc_lim=perc_lim), axis=0, arr=uw_outflow)
 
 #inpainting
 interp_limit = 5
@@ -198,7 +231,7 @@ LLJ_nose=z_grid[np.argmax(u_avg_inp,axis=1)]
 
 #%% Plots
 plt.close('all')
-skip=int(len(Data.x)/max_plot)
+skip=int(np.ceil(len(Data.x)/max_plot))
 plt.figure(figsize=(18,4))
 plt.scatter(Data.x.values[::skip],Data.z.values[::skip],s=1,c=Data.u.values[::skip],cmap='coolwarm',vmin=0.25,vmax=1)
 ax=plt.gca()
