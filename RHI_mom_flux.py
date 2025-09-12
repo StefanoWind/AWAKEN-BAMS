@@ -139,7 +139,7 @@ if not os.path.isfile(save_name):
                 Data=Data.where(Data.qc_wind_speed==0).where(np.abs(np.cos(np.radians(Data.elevation)))>min_cos)
                 real=~np.isnan(Data.x+Data.z+Data.wind_speed).values
                 x=np.append(x,Data.x.values[real]+config['turbine_x'][s])
-                z=np.append(z,Data.z.values[real])+H
+                z=np.append(z,Data.z.values[real]+H)
                 
                 U_inf=(ws_int1[files==f]+ws_int2[files==f])/2
                 
@@ -269,7 +269,7 @@ ax=fig.add_subplot(gs[0])
 plt.plot(uw_inflow_avg,Data.height,'-b')
 plt.plot(uw_outflow_avg,Data.height,'-r')
 plt.ylim([0,1000])
-plt.xlim([-0.05,0.01])
+# plt.xlim([-0.05,0.01])
 plt.xlabel('$\overline{u^\prime w^\prime}/U_\infty^2$')
 plt.grid()
 
