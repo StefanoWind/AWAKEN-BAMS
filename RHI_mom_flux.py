@@ -188,6 +188,8 @@ if not os.path.isfile(save_name):
     Output['x']=xr.DataArray(x,coords={'index':np.arange(len(x))})
     Output['z']=xr.DataArray(z,coords={'index':np.arange(len(x))})
     Output['u']=xr.DataArray(u,coords={'index':np.arange(len(x))})
+    Output['uw_inflow']= xr.DataArray(uw_inflow, coords={'index2':np.arange(len(uw_inflow[:,0])), 'height':uw_inflow_int.height})
+    Output['uw_outflow']=xr.DataArray(uw_outflow,coords={'index2':np.arange(len(uw_outflow[:,0])),'height':uw_outflow_int.height})
     Output.to_netcdf(save_name)
     Output.close()
 
@@ -210,8 +212,8 @@ u_avg[u_top-u_low>max_err_u]=np.nan
 x_grid=(bin_x[:-1]+bin_x[1:])/2
 z_grid=(bin_z[:-1]+bin_z[1:])/2
 
-uw_inflow_avg= np.apply_along_axis(lambda x: utl.filt_stat(x,   np.nanmean,perc_lim=perc_lim), axis=0, arr=uw_inflow)
-uw_outflow_avg= np.apply_along_axis(lambda x: utl.filt_stat(x,   np.nanmean,perc_lim=perc_lim), axis=0, arr=uw_outflow)
+uw_inflow_avg= np.apply_along_axis(lambda x: utl.filt_stat(x,   np.nanmean,perc_lim=perc_lim), axis=0, arr=Data.uw_inflow.values)
+uw_outflow_avg= np.apply_along_axis(lambda x: utl.filt_stat(x,   np.nanmean,perc_lim=perc_lim), axis=0, arr=Data.uw_outflow.values)
 
 #inpainting
 interp_limit = 5
