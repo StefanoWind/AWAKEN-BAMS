@@ -10,6 +10,7 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 from matplotlib import pyplot as plt
+from matplotlib.gridspec import GridSpec
 import matplotlib
 import scipy as sp
 import yaml
@@ -27,7 +28,7 @@ matplotlib.rcParams['savefig.dpi'] = 200
 if len(sys.argv)==1:
     source_config=os.path.join(cd,'configs/config.yaml')
     ws_lim=[10.0,30.0]#m/s
-    wd_lim=180.0#[deg]
+    wd_lim=20.0#[deg]
     ti_lim=[0.0,10.0]#[deg]
     llj_lim=[300.0,500.0]
 else:
@@ -44,6 +45,7 @@ min_cos=1/3
 scan_duration=600#[s]
 inflow_site='A1'
 outflow_site='H'
+H=90
 
 #stats
 perc_lim=[5,95]#[%] percentile limits
@@ -137,9 +139,11 @@ if not os.path.isfile(save_name):
                 Data=Data.where(Data.qc_wind_speed==0).where(np.abs(np.cos(np.radians(Data.elevation)))>min_cos)
                 real=~np.isnan(Data.x+Data.z+Data.wind_speed).values
                 x=np.append(x,Data.x.values[real]+config['turbine_x'][s])
-                z=np.append(z,Data.z.values[real])
+                z=np.append(z,Data.z.values[real])+H
                 
-                u_eq=-Data.wind_speed/np.cos(np.radians(Data.elevation+ele_corr))/((ws_int1[files==f]+ws_int2[files==f])/2)
+                U_inf=(ws_int1[files==f]+ws_int2[files==f])/2
+                
+                u_eq=-Data.wind_speed/np.cos(np.radians(Data.elevation+ele_corr))/U_inf
                 
                 u=np.append(u,u_eq.values[real])
                 
@@ -148,7 +152,7 @@ if not os.path.isfile(save_name):
                 file_inflow=glob.glob(os.path.join(config['source_prof'][inflow_site],f'*{date}*nc'))
                 if len(file_inflow)==1:
                     Data_inflow=xr.open_dataset(file_inflow[0])
-                    uw_inflow_int=Data_inflow.uw.interp(time=[time_avg]).squeeze()
+                    uw_inflow_int=Data_inflow.uw.interp(time=[time_avg]).squeeze()/U_inf**2
                     if len(uw_inflow)==0:
                         uw_inflow=uw_inflow_int.values
                     else:
@@ -157,13 +161,13 @@ if not os.path.isfile(save_name):
                 file_outflow=glob.glob(os.path.join(config['source_prof'][outflow_site],f'*{date}*nc'))
                 if len(file_outflow)==1:
                     Data_outflow=xr.open_dataset(file_outflow[0])
-                    uw_outflow_int=Data_outflow.uw.interp(time=[time_avg]).squeeze()
+                    uw_outflow_int=Data_outflow.uw.interp(time=[time_avg]).squeeze()/U_inf**2
                     if len(uw_outflow)==0:
                         uw_outflow=uw_outflow_int.values
                     else:
                         uw_outflow=np.vstack([uw_outflow,uw_outflow_int.values])
                         
-                print(f'{f} done')
+                print(f'{f} done',flush=True)
                 
                 #plots
                 plt.figure(figsize=(18,4))
@@ -175,7 +179,7 @@ if not os.path.isfile(save_name):
                 plt.title(os.path.basename(f))
                 ax=plt.gca()
                 ax.set_aspect('equal')
-                plt.xlim([-2000,8000])
+                plt.xlim([-2000,8500])
                 plt.ylim([0,1250])
                 plt.xlabel(r'$x$ [m]')
                 plt.ylabel(r'$y$ [m]')
@@ -197,10 +201,10 @@ if not os.path.isfile(save_name):
 
 #load data
 Data=xr.open_dataset(save_name)
-Data=Data.where((Data.u>=min_u)*(Data.u<=max_u))
+Data['u']=Data.u.where((Data.u>=min_u)*(Data.u<=max_u))
 
 #stats
-bin_x=np.arange(-2000,8000,dx)
+bin_x=np.arange(-2000,8300,dx)
 bin_z=np.arange(0,1250,dz)
 u_avg=stats.binned_statistic_2d(Data.x.values,Data.z.values,Data.u.values,
                                 statistic=lambda x: utl.filt_stat(x,   np.nanmean,perc_lim=perc_lim),bins=[bin_x,bin_z])[0]
@@ -244,20 +248,32 @@ plt.xlim([-1800,7800])
 plt.ylim([0,1000])
 plt.grid()
 
-plt.figure(figsize=(18,4))
-cf=plt.contourf(x_grid,z_grid,u_avg.T,np.arange(0.25,1.01,0.05),cmap='coolwarm',extend='both')
-plt.contour(x_grid,z_grid,u_avg.T,np.arange(0.25,1.01,0.05),extend='both',linewidths=1,alpha=0.25,colors='k')
-ax=plt.gca()
-ax.set_aspect('equal')
-plt.xlim([-1800,7800])
-plt.ylim([0,1000])
-plt.grid()
-plt.xlabel(r'$x$ [m]')
-plt.ylabel(r'$y$ [m]')
-plt.grid()
-plt.colorbar(cf,label='$u/U_\infty$ [m s$^{-1}$]')
+# plt.figure(figsize=(18,4))
+# cf=plt.contourf(x_grid,z_grid,u_avg.T,np.arange(0.25,1.01,0.05),cmap='coolwarm',extend='both')
+# plt.contour(x_grid,z_grid,u_avg.T,np.arange(0.25,1.01,0.05),extend='both',linewidths=1,alpha=0.25,colors='k')
+# ax=plt.gca()
+# ax.set_aspect('equal')
+# plt.xlim([-1800,7800])
+# plt.ylim([0,1000])
+# plt.grid()
+# plt.xlabel(r'$x$ [m]')
+# plt.ylabel(r'$y$ [m]')
+# plt.grid()
+# plt.colorbar(cf,label='$u/U_\infty$ [m s$^{-1}$]')
 
-plt.figure(figsize=(18,4))
+fig=plt.figure(figsize=(18,2))
+matplotlib.rcParams['savefig.dpi'] = 500
+gs = GridSpec(nrows=1, ncols=3, width_ratios=[2,6,0.5], figure=fig)
+
+ax=fig.add_subplot(gs[0])
+plt.plot(uw_inflow_avg,Data.height,'-b')
+plt.plot(uw_outflow_avg,Data.height,'-r')
+plt.ylim([0,1000])
+plt.xlim([-0.05,0.01])
+plt.xlabel('$\overline{u^\prime w^\prime}/U_\infty^2$')
+plt.grid()
+
+ax=fig.add_subplot(gs[1])
 cf=plt.contourf(x_grid,z_grid,u_avg_inp.T,np.arange(0.5,0.91,0.05),cmap='coolwarm',extend='both')
 plt.contour(x_grid,z_grid,u_avg_inp.T,np.arange(0.5,0.91,0.05),extend='both',linewidths=1,alpha=0.25,colors='k')
 for s in config['source_rhi']:
@@ -265,10 +281,16 @@ for s in config['source_rhi']:
 plt.plot(x_grid,LLJ_nose,'.k',markersize=10,markerfacecolor='w')
 ax=plt.gca()
 ax.set_aspect('equal')
-plt.xlim([-1800,7800])
+plt.xlim([-1800,8100])
 plt.ylim([0,1000])
 plt.grid()
 plt.xlabel(r'$x$ [m]')
 plt.ylabel(r'$y$ [m]')
 plt.grid()
-plt.colorbar(cf,label='$u/U_\infty$ [m s$^{-1}$]')
+
+plt.plot([config['inflow_x'],config['inflow_x']],[0,1000],'--b')
+plt.plot([config['outflow_x'],config['outflow_x']],[0,1000],'--r')
+
+cax=fig.add_subplot(gs[2])
+plt.colorbar(cf,cax=cax,label='$u/U_\infty$ [m s$^{-1}$]')
+plt.tight_layout()
