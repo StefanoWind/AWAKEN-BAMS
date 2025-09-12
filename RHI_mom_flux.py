@@ -152,12 +152,12 @@ if not os.path.isfile(save_name):
                     if len(uw_inflow)==0:
                         uw_inflow=uw_inflow_int.values
                     else:
-                        uw_inflow=np.vstack([uw_inflow,uw_inflow_int.values]).squeeze()
+                        uw_inflow=np.vstack([uw_inflow,uw_inflow_int.values])
                     
                 file_outflow=glob.glob(os.path.join(config['source_prof'][outflow_site],f'*{date}*nc'))
                 if len(file_outflow)==1:
                     Data_outflow=xr.open_dataset(file_outflow[0])
-                    uw_outflow_int=Data_outflow.uw.interp(time=[time_avg])
+                    uw_outflow_int=Data_outflow.uw.interp(time=[time_avg]).squeeze()
                     if len(uw_outflow)==0:
                         uw_outflow=uw_outflow_int.values
                     else:
