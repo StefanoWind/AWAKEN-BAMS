@@ -162,6 +162,8 @@ if not os.path.isfile(save_name):
                         uw_outflow=uw_outflow_int.values
                     else:
                         uw_outflow=np.vstack([uw_outflow,uw_outflow_int.values])
+                        
+                print(f'{f} done')
                 
                 #plots
                 plt.figure(figsize=(18,4))
