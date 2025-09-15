@@ -185,7 +185,7 @@ if not os.path.isfile(save_name):
                 
                 #plots
                 plt.figure(figsize=(18,4))
-                plt.scatter(Data.x.values[real]+config['turbine_x'][s],Data.z.values[real],s=1,c=u_eq.values[real],cmap='coolwarm',vmin=0.25,vmax=1)
+                plt.scatter(Data.x_corr.values[real]+config['turbine_x'][s],Data.z_corr.values[real],s=1,c=u_eq.values[real],cmap='coolwarm',vmin=0.25,vmax=1)
                 plt.plot(config['inflow_x']+uw_inflow_int.height*0,uw_inflow_int.height,'--k')
                 plt.plot(config['inflow_x']+uw_inflow_int*1000000,uw_inflow_int.height,'g')
                 plt.plot(config['outflow_x']+uw_outflow_int.height*0,uw_outflow_int.height,'--k')
