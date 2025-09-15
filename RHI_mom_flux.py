@@ -11,26 +11,26 @@ import pandas as pd
 import xarray as xr
 from matplotlib import pyplot as plt
 from matplotlib.gridspec import GridSpec
+from lisboa import statistics as stats
 import matplotlib
 import scipy as sp
 import yaml
 import re
 import glob
-from scipy import stats
 import warnings
 warnings.filterwarnings('ignore')
 matplotlib.rcParams['font.family'] = 'serif'
 matplotlib.rcParams['mathtext.fontset'] = 'cm'
-matplotlib.rcParams['font.size'] = 12
+matplotlib.rcParams['font.size'] = 14
 matplotlib.rcParams['savefig.dpi'] = 200
 
 #%% Inputs
 if len(sys.argv)==1:
     source_config=os.path.join(cd,'configs/config.yaml')
-    ws_lim=[10.0,30.0]#m/s
-    wd_lim=20.0#[deg]
-    ti_lim=[0.0,10.0]#[deg]
-    llj_lim=[300.0,500.0]
+    ws_lim=[-10000,30.0]#[m/s] LLJ nose wind speed range
+    wd_lim=180.0#[deg] max misalignment
+    ti_lim=[0.0,10.0]#[%] TI range
+    llj_lim=[-10000,500.0]#[m] LLJ nose height limits
 else:
     source_config=sys.argv[1]
     ws_lim=[np.float64(sys.argv[2]),np.float64(sys.argv[3])]
@@ -40,23 +40,30 @@ else:
 
 #fixed inputs
 source_log=os.path.join(cd,'data/glob.lidar.eventlog.avg.c2.20230101.000500.csv')#inflow table source
-wd_ref=180#[deg]
-min_cos=1/3
-scan_duration=600#[s]
-inflow_site='A1'
+wd_ref=180#[deg] aligned wind directipon
+min_cos=1/3 #minimum cosine for de-projection
+scan_duration=600#[s] scan duration
+inflow_site='A1' 
 outflow_site='H'
-H=90
+H=90#[m] hub height
+D=127 #[m] diameter
 
 #stats
 perc_lim=[5,95]#[%] percentile limits
-p_value=0.05#p-value for c.i.
-dx=100#[m]
-dz=50#[m]
-max_err_u=0.1
-min_N=100
-min_u=0.1
-max_u=1.5
-ele_corr=2
+min_u=0.1 #minimum normalized wind speed
+max_u=1.5#maximum normalized wind speed
+ele_corr=2#lidar tilt
+
+config_lisboa={'sigma':0.25,
+        'mins':[-1800,0],
+        'maxs':[8000,1000],
+        'Dn0':[200,50],
+        'r_max':3,
+        'dist_edge':1,
+        'tol_dist':0.1,
+        'grid_factor':0.25,
+        'max_Dd':1,
+        'max_iter':3}
 
 #graphics
 max_plot=1000000
@@ -90,6 +97,7 @@ u=[]
 uw_inflow=[]
 uw_outflow=[]
 
+#file system
 save_name=os.path.join(cd,'data',f'rhi.{ws_lim[0]}.{ws_lim[1]}.{wd_lim}.{ti_lim[0]}.{ti_lim[1]}.{llj_lim[0]}.{llj_lim[1]}.nc')
 os.makedirs(os.path.join(cd,'figures',os.path.basename(save_name)[:-3]),exist_ok=True)
              
@@ -136,7 +144,7 @@ if not os.path.isfile(save_name):
             for f in files_sel:
                 Data=xr.open_dataset(f)
                 time_avg=(Data.time.isel(scanID=0,beamID=0)+(Data.time.isel(scanID=-1,beamID=-1)-Data.time.isel(scanID=0,beamID=0))/2).values
-                Data=Data.where(Data.qc_wind_speed==0).where(np.abs(np.cos(np.radians(Data.elevation)))>min_cos)
+                Data=Data.where(Data.qc_wind_speed==0).where(np.abs(np.cos(np.radians(Data.elevation+ele_corr)))>min_cos)
                 real=~np.isnan(Data.x+Data.z+Data.wind_speed).values
                 x=np.append(x,Data.x.values[real]+config['turbine_x'][s])
                 z=np.append(z,Data.z.values[real]+H)
@@ -173,9 +181,9 @@ if not os.path.isfile(save_name):
                 plt.figure(figsize=(18,4))
                 plt.scatter(Data.x.values[real]+config['turbine_x'][s],Data.z.values[real],s=1,c=u_eq.values[real],cmap='coolwarm',vmin=0.25,vmax=1)
                 plt.plot(config['inflow_x']+uw_inflow_int.height*0,uw_inflow_int.height,'--k')
-                plt.plot(config['inflow_x']+uw_inflow_int*10000,uw_inflow_int.height,'g')
+                plt.plot(config['inflow_x']+uw_inflow_int*1000000,uw_inflow_int.height,'g')
                 plt.plot(config['outflow_x']+uw_outflow_int.height*0,uw_outflow_int.height,'--k')
-                plt.plot(config['outflow_x']+uw_outflow_int*10000,uw_outflow_int.height,'g')
+                plt.plot(config['outflow_x']+uw_outflow_int*1000000,uw_outflow_int.height,'g')
                 plt.title(os.path.basename(f))
                 ax=plt.gca()
                 ax.set_aspect('equal')
@@ -203,23 +211,17 @@ if not os.path.isfile(save_name):
 Data=xr.open_dataset(save_name)
 Data['u']=Data.u.where((Data.u>=min_u)*(Data.u<=max_u))
 
-#stats
-bin_x=np.arange(-2000,8300,dx)
-bin_z=np.arange(0,1250,dz)
-u_avg=stats.binned_statistic_2d(Data.x.values,Data.z.values,Data.u.values,
-                                statistic=lambda x: utl.filt_stat(x,   np.nanmean,perc_lim=perc_lim),bins=[bin_x,bin_z])[0]
-u_low=stats.binned_statistic_2d(Data.x.values,Data.z.values,Data.u.values,
-                                statistic=lambda x: utl.filt_BS_stat(x,np.nanmean,perc_lim=perc_lim,p_value=p_value/2*100,min_N=min_N),bins=[bin_x,bin_z])[0]
-u_top=stats.binned_statistic_2d(Data.x.values,Data.z.values,Data.u.values,
-                                statistic=lambda x: utl.filt_BS_stat(x,np.nanmean,perc_lim=perc_lim,p_value=(1-p_value/2)*100,min_N=min_N),bins=[bin_x,bin_z])[0]
-
-u_avg[u_top-u_low>max_err_u]=np.nan
-
-x_grid=(bin_x[:-1]+bin_x[1:])/2
-z_grid=(bin_z[:-1]+bin_z[1:])/2
-
 uw_inflow_avg= np.apply_along_axis(lambda x: utl.filt_stat(x,   np.nanmean,perc_lim=perc_lim), axis=0, arr=Data.uw_inflow.values)
 uw_outflow_avg= np.apply_along_axis(lambda x: utl.filt_stat(x,   np.nanmean,perc_lim=perc_lim), axis=0, arr=Data.uw_outflow.values)
+
+
+x_exp=[Data.x.values.ravel(),Data.z.values.ravel()]
+f=Data.u.where((Data.u>=min_u)*(Data.u<=max_u)).values.ravel()
+
+lproc=stats.statistics(config_lisboa)                
+grid,Dd,excl,u_avg,hom=lproc.calculate_statistics(x_exp,f)
+x_grid=grid[0]
+z_grid=grid[1]
 
 #inpainting
 interp_limit = 5
@@ -235,7 +237,8 @@ u_avg_inp = u_avg.copy()
 u_avg_inp[interp_mask1] = interpolated_values1
 
 #LLJ height
-LLJ_nose=z_grid[np.argmax(u_avg_inp,axis=1)]
+u_avg_inp[:,0]=0
+LLJ_nose=z_grid[np.nanargmax(u_avg_inp,axis=1)]
 
 #%% Plots
 plt.close('all')
@@ -248,49 +251,42 @@ plt.xlim([-1800,7800])
 plt.ylim([0,1000])
 plt.grid()
 
-# plt.figure(figsize=(18,4))
-# cf=plt.contourf(x_grid,z_grid,u_avg.T,np.arange(0.25,1.01,0.05),cmap='coolwarm',extend='both')
-# plt.contour(x_grid,z_grid,u_avg.T,np.arange(0.25,1.01,0.05),extend='both',linewidths=1,alpha=0.25,colors='k')
-# ax=plt.gca()
-# ax.set_aspect('equal')
-# plt.xlim([-1800,7800])
-# plt.ylim([0,1000])
-# plt.grid()
-# plt.xlabel(r'$x$ [m]')
-# plt.ylabel(r'$y$ [m]')
-# plt.grid()
-# plt.colorbar(cf,label='$u/U_\infty$ [m s$^{-1}$]')
-
-fig=plt.figure(figsize=(18,2))
+fig=plt.figure(figsize=(18,2.5))
 matplotlib.rcParams['savefig.dpi'] = 500
-gs = GridSpec(nrows=1, ncols=3, width_ratios=[2,6,0.5], figure=fig)
+gs = GridSpec(nrows=1, ncols=3, width_ratios=[1,6,0.25], figure=fig)
 
 ax=fig.add_subplot(gs[0])
-plt.plot(uw_inflow_avg,Data.height,'-b')
-plt.plot(uw_outflow_avg,Data.height,'-r')
+plt.plot(Data.height*0,Data.height,'--k')
+plt.plot(uw_inflow_avg,Data.height,'-g',label='Inflow')
+plt.plot(uw_outflow_avg,Data.height,'-m',label='Outflow')
 plt.ylim([0,1000])
-# plt.xlim([-0.05,0.01])
+plt.xlim([-0.0001,0.00001])
+plt.xticks([-0.0001,0],labels=[r'$-10^{-4}$',r'$0$'])
+plt.ylabel(r'$y$ [m]')
 plt.xlabel('$\overline{u^\prime w^\prime}/U_\infty^2$')
 plt.grid()
+plt.legend()
 
 ax=fig.add_subplot(gs[1])
 cf=plt.contourf(x_grid,z_grid,u_avg_inp.T,np.arange(0.5,0.91,0.05),cmap='coolwarm',extend='both')
 plt.contour(x_grid,z_grid,u_avg_inp.T,np.arange(0.5,0.91,0.05),extend='both',linewidths=1,alpha=0.25,colors='k')
 for s in config['source_rhi']:
-    plt.plot([config['turbine_x'][s],config['turbine_x'][s]],[0,127/2],'k',linewidth=3)
+    plt.plot([config['turbine_x'][s],config['turbine_x'][s]],[-D/2+H,D/2+H],'k',linewidth=3)
 plt.plot(x_grid,LLJ_nose,'.k',markersize=10,markerfacecolor='w')
 ax=plt.gca()
 ax.set_aspect('equal')
+ax.set_yticklabels([])
 plt.xlim([-1800,8100])
 plt.ylim([0,1000])
 plt.grid()
 plt.xlabel(r'$x$ [m]')
-plt.ylabel(r'$y$ [m]')
+
 plt.grid()
 
-plt.plot([config['inflow_x'],config['inflow_x']],[0,1000],'--b')
-plt.plot([config['outflow_x'],config['outflow_x']],[0,1000],'--r')
+plt.plot([config['inflow_x'],config['inflow_x']],[0,1000],'--g',linewidth=2)
+plt.plot([config['outflow_x'],config['outflow_x']],[0,1000],'--m',linewidth=2)
 
 cax=fig.add_subplot(gs[2])
 plt.colorbar(cf,cax=cax,label='$u/U_\infty$ [m s$^{-1}$]')
 plt.tight_layout()
+
