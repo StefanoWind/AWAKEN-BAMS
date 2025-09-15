@@ -27,10 +27,10 @@ matplotlib.rcParams['savefig.dpi'] = 200
 #%% Inputs
 if len(sys.argv)==1:
     source_config=os.path.join(cd,'configs/config.yaml')
-    ws_lim=[-10000,30.0]#[m/s] LLJ nose wind speed range
+    ws_lim=[10.0,30.0]#[m/s] LLJ nose wind speed range
     wd_lim=180.0#[deg] max misalignment
     ti_lim=[0.0,10.0]#[%] TI range
-    llj_lim=[-10000,500.0]#[m] LLJ nose height limits
+    llj_lim=[300.0,500.0]#[m] LLJ nose height limits
 else:
     source_config=sys.argv[1]
     ws_lim=[np.float64(sys.argv[2]),np.float64(sys.argv[3])]
@@ -57,7 +57,7 @@ ele_corr=2#lidar tilt
 config_lisboa={'sigma':0.25,
         'mins':[-1800,0],
         'maxs':[8000,1000],
-        'Dn0':[200,50],
+        'Dn0':[127*4,127],
         'r_max':3,
         'dist_edge':1,
         'tol_dist':0.1,
@@ -144,14 +144,20 @@ if not os.path.isfile(save_name):
             for f in files_sel:
                 Data=xr.open_dataset(f)
                 time_avg=(Data.time.isel(scanID=0,beamID=0)+(Data.time.isel(scanID=-1,beamID=-1)-Data.time.isel(scanID=0,beamID=0))/2).values
-                Data=Data.where(Data.qc_wind_speed==0).where(np.abs(np.cos(np.radians(Data.elevation+ele_corr)))>min_cos)
-                real=~np.isnan(Data.x+Data.z+Data.wind_speed).values
-                x=np.append(x,Data.x.values[real]+config['turbine_x'][s])
-                z=np.append(z,Data.z.values[real]+H)
+                
+                #tilt correction
+                Data['elevation']=Data.elevation+Data.pitch.median()
+                Data['x_corr']=Data.range*np.cos(np.radians(Data.elevation))*np.cos(np.radians(90-Data.azimuth))
+                Data['z_corr']=Data.range*np.sin(np.radians(Data.elevation))
+                
+                Data=Data.where(Data.qc_wind_speed==0).where(np.abs(np.cos(np.radians(Data.elevation)))>min_cos)
+                real=~np.isnan(Data.x_corr+Data.z_corr+Data.wind_speed).values
+                x=np.append(x,Data.x_corr.values[real]+config['turbine_x'][s])
+                z=np.append(z,Data.z_corr.values[real]+H)
                 
                 U_inf=(ws_int1[files==f]+ws_int2[files==f])/2
                 
-                u_eq=-Data.wind_speed/np.cos(np.radians(Data.elevation+ele_corr))/U_inf
+                u_eq=-Data.wind_speed/np.cos(np.radians(Data.elevation))/U_inf
                 
                 u=np.append(u,u_eq.values[real])
                 
@@ -237,14 +243,13 @@ u_avg_inp = u_avg.copy()
 u_avg_inp[interp_mask1] = interpolated_values1
 
 #LLJ height
-u_avg_inp[:,0]=0
 LLJ_nose=z_grid[np.nanargmax(u_avg_inp,axis=1)]
 
 #%% Plots
 plt.close('all')
 skip=int(np.ceil(len(Data.x)/max_plot))
 plt.figure(figsize=(18,4))
-plt.scatter(Data.x.values[::skip],Data.z.values[::skip],s=1,c=Data.u.values[::skip],cmap='coolwarm',vmin=0.25,vmax=1)
+plt.scatter(Data.x.values[::skip],Data.z.values[::skip],s=1,c=Data.u.values[::skip],cmap='coolwarm',vmin=0.5,vmax=0.95)
 ax=plt.gca()
 ax.set_aspect('equal')
 plt.xlim([-1800,7800])
@@ -268,10 +273,10 @@ plt.grid()
 plt.legend()
 
 ax=fig.add_subplot(gs[1])
-cf=plt.contourf(x_grid,z_grid,u_avg_inp.T,np.arange(0.5,0.91,0.05),cmap='coolwarm',extend='both')
-plt.contour(x_grid,z_grid,u_avg_inp.T,np.arange(0.5,0.91,0.05),extend='both',linewidths=1,alpha=0.25,colors='k')
+cf=plt.contourf(x_grid,z_grid,u_avg_inp.T,np.arange(0.4,0.96,0.05),cmap='coolwarm',extend='both')
+plt.contour(x_grid,z_grid,u_avg_inp.T,np.arange(0.4,0.96,0.05),extend='both',linewidths=1,alpha=0.25,colors='k')
 for s in config['source_rhi']:
-    plt.plot([config['turbine_x'][s],config['turbine_x'][s]],[-D/2+H,D/2+H],'k',linewidth=3)
+    plt.plot([config['turbine_x'][s],config['turbine_x'][s]],[-D/2+H,D/2+H],'k',linewidth=1)
 plt.plot(x_grid,LLJ_nose,'.k',markersize=10,markerfacecolor='w')
 ax=plt.gca()
 ax.set_aspect('equal')
