@@ -21,8 +21,9 @@ import warnings
 warnings.filterwarnings('ignore')
 matplotlib.rcParams['font.family'] = 'serif'
 matplotlib.rcParams['mathtext.fontset'] = 'cm'
-matplotlib.rcParams['font.size'] = 14
-matplotlib.rcParams['savefig.dpi'] = 200
+matplotlib.rcParams['font.size'] = 18
+matplotlib.rcParams['savefig.dpi'] = 500
+plt.close('all')
 
 #%% Inputs
 if len(sys.argv)==1:
@@ -46,17 +47,19 @@ scan_duration=600#[s] scan duration
 inflow_site='A1' 
 outflow_site='H'
 H=90#[m] hub height
+z_hub=110#[m] selected height for hub hight conditions
 D=127 #[m] diameter
 
 #stats
 perc_lim=[5,95]#[%] percentile limits
 min_u=0.1 #minimum normalized wind speed
 max_u=1.5#maximum normalized wind speed
-ele_corr=2#lidar tilt
+min_du=-0.5 #minimum normalized wind speed difference
+max_du=0.5 #maximum normalized wind speed difference
 
 config_lisboa={'sigma':0.25,
         'mins':[-1800,0],
-        'maxs':[8000,1000],
+        'maxs':[8250,1000],
         'Dn0':[127*4,127],
         'r_max':3,
         'dist_edge':1,
@@ -94,6 +97,7 @@ inflow=xr.Dataset.from_dataframe(inflow_df).rename({'UTC Time':'time'})
 x=[]
 z=[]
 u=[]
+du=[]
 uw_inflow=[]
 uw_outflow=[]
 
@@ -155,18 +159,38 @@ if not os.path.isfile(save_name):
                 x=np.append(x,Data.x_corr.values[real]+config['turbine_x'][s])
                 z=np.append(z,Data.z_corr.values[real]+H)
                 
-                U_inf=(ws_int1[files==f]+ws_int2[files==f])/2
+                #inflow
+                date=os.path.basename(f).split('.')[4]
+                file_inflow=glob.glob(os.path.join(config['source_prof'][inflow_site],f'*{date}*nc'))
+                if len(file_inflow)==1:
+                    Data_inflow=xr.open_dataset(file_inflow[0])
+                    WS=Data_inflow.WS.interp(time=[time_avg]).squeeze()
+                    cos=np.cos(np.radians(Data_inflow.WD)).interp(time=[time_avg]).squeeze()
+                    sin=np.sin(np.radians(Data_inflow.WD)).interp(time=[time_avg]).squeeze()
+                    WD=np.degrees(np.arctan2(sin,cos))%360
+                    
+                WS_hub=WS.sel(height=z_hub).values
+                WD_hub=WD.sel(height=z_hub).values
                 
-                u_eq=-Data.wind_speed/np.cos(np.radians(Data.elevation))/U_inf
+                WS_int=np.interp(Data.z_corr.values,WS.height.values,WS.values)
+                Data['WS']=xr.DataArray(WS_int,coords=Data.z_corr.coords)
+                
+                cos=np.interp(Data.z_corr.values,WD.height.values,np.cos(np.radians(WD.values-WD_hub)))
+                sin=np.interp(Data.z_corr.values,WD.height.values,np.sin(np.radians(WD.values-WD_hub)))
+                Data['dWD']=xr.DataArray(np.degrees(np.arctan2(sin,cos))%360,coords=Data.z_corr.coords)
+                
+                u_eq=-Data.wind_speed/np.cos(np.radians(Data.elevation))/np.cos(np.radians(Data.dWD))/WS_hub
+                du_eq=u_eq-Data['WS']/WS_hub
                 
                 u=np.append(u,u_eq.values[real])
+                du=np.append(du,du_eq.values[real])
                 
                 #mom flux
                 date=os.path.basename(f).split('.')[4]
                 file_inflow=glob.glob(os.path.join(config['source_prof'][inflow_site],f'*{date}*nc'))
                 if len(file_inflow)==1:
                     Data_inflow=xr.open_dataset(file_inflow[0])
-                    uw_inflow_int=Data_inflow.uw.interp(time=[time_avg]).squeeze()/U_inf**2
+                    uw_inflow_int=Data_inflow.uw.interp(time=[time_avg]).squeeze()/WS_hub**2
                     if len(uw_inflow)==0:
                         uw_inflow=uw_inflow_int.values
                     else:
@@ -175,7 +199,7 @@ if not os.path.isfile(save_name):
                 file_outflow=glob.glob(os.path.join(config['source_prof'][outflow_site],f'*{date}*nc'))
                 if len(file_outflow)==1:
                     Data_outflow=xr.open_dataset(file_outflow[0])
-                    uw_outflow_int=Data_outflow.uw.interp(time=[time_avg]).squeeze()/U_inf**2
+                    uw_outflow_int=Data_outflow.uw.interp(time=[time_avg]).squeeze()/WS_hub**2
                     if len(uw_outflow)==0:
                         uw_outflow=uw_outflow_int.values
                     else:
@@ -184,7 +208,8 @@ if not os.path.isfile(save_name):
                 print(f'{f} done',flush=True)
                 
                 #plots
-                plt.figure(figsize=(18,4))
+                plt.figure(figsize=(18,8))
+                ax=plt.subplot(2,1,1)
                 plt.scatter(Data.x_corr.values[real]+config['turbine_x'][s],Data.z_corr.values[real],s=1,c=u_eq.values[real],cmap='coolwarm',vmin=0.25,vmax=1)
                 plt.plot(config['inflow_x']+uw_inflow_int.height*0,uw_inflow_int.height,'--k')
                 plt.plot(config['inflow_x']+uw_inflow_int*1000000,uw_inflow_int.height,'g')
@@ -200,6 +225,17 @@ if not os.path.isfile(save_name):
                 plt.grid()
                 plt.colorbar(label='$u/U_\infty$ [m s$^{-1}$]')
                 
+                ax=plt.subplot(2,1,2)
+                plt.scatter(Data.x_corr.values[real]+config['turbine_x'][s],Data.z_corr.values[real],s=1,c=du_eq.values[real],cmap='seismic',vmin=-0.25,vmax=0.25)
+                ax=plt.gca()
+                ax.set_aspect('equal')
+                plt.xlim([-2000,8500])
+                plt.ylim([0,1250])
+                plt.xlabel(r'$x$ [m]')
+                plt.ylabel(r'$y$ [m]')
+                plt.grid()
+                plt.colorbar(label='$\Delta u/U_\infty$ [m s$^{-1}$]')
+                
                 plt.savefig(os.path.join(cd,'figures',os.path.basename(save_name)[:-3],os.path.basename(f).replace('nc','png')))
                 plt.close()
                 
@@ -208,6 +244,7 @@ if not os.path.isfile(save_name):
     Output['x']=xr.DataArray(x,coords={'index':np.arange(len(x))})
     Output['z']=xr.DataArray(z,coords={'index':np.arange(len(x))})
     Output['u']=xr.DataArray(u,coords={'index':np.arange(len(x))})
+    Output['du']=xr.DataArray(du,coords={'index':np.arange(len(x))})
     Output['uw_inflow']= xr.DataArray(uw_inflow, coords={'index2':np.arange(len(uw_inflow[:,0])), 'height':uw_inflow_int.height})
     Output['uw_outflow']=xr.DataArray(uw_outflow,coords={'index2':np.arange(len(uw_outflow[:,0])),'height':uw_outflow_int.height})
     Output.to_netcdf(save_name)
@@ -215,19 +252,20 @@ if not os.path.isfile(save_name):
 
 #load data
 Data=xr.open_dataset(save_name)
-Data['u']=Data.u.where((Data.u>=min_u)*(Data.u<=max_u))
 
-uw_inflow_avg= np.apply_along_axis(lambda x: utl.filt_stat(x,   np.nanmean,perc_lim=perc_lim), axis=0, arr=Data.uw_inflow.values)
+#uw stats
+uw_inflow_avg=  np.apply_along_axis(lambda x: utl.filt_stat(x,   np.nanmean,perc_lim=perc_lim), axis=0, arr=Data.uw_inflow.values)
 uw_outflow_avg= np.apply_along_axis(lambda x: utl.filt_stat(x,   np.nanmean,perc_lim=perc_lim), axis=0, arr=Data.uw_outflow.values)
 
-
+#lisboa
 x_exp=[Data.x.values.ravel(),Data.z.values.ravel()]
-f=Data.u.where((Data.u>=min_u)*(Data.u<=max_u)).values.ravel()
+lproc=stats.statistics(config_lisboa)  
 
-lproc=stats.statistics(config_lisboa)                
+f=Data.u.where((Data.u>=min_u)*(Data.u<=max_u)).values.ravel()
 grid,Dd,excl,u_avg,hom=lproc.calculate_statistics(x_exp,f)
 x_grid=grid[0]
 z_grid=grid[1]
+u_avg[excl]=np.nan
 
 #inpainting
 interp_limit = 5
@@ -241,6 +279,23 @@ interp_points1 = np.column_stack((yy1[interp_mask1], xx1[interp_mask1]))
 interpolated_values1 = sp.interpolate.griddata(points1, values1, interp_points1, method='linear')
 u_avg_inp = u_avg.copy()
 u_avg_inp[interp_mask1] = interpolated_values1
+
+f=Data.u.where((Data.du>=min_du)*(Data.du<=max_du)).values.ravel()
+grid,Dd,excl,du_avg,hom=lproc.calculate_statistics(x_exp,f)
+du_avg[excl]=np.nan
+
+#inpainting
+interp_limit = 5
+valid_mask1 = ~np.isnan(du_avg)
+distance1 = sp.ndimage.distance_transform_edt(~valid_mask1)
+interp_mask1 = (np.isnan(du_avg)) & (distance1 <= interp_limit)
+yy1, xx1 = np.indices(du_avg.shape)
+points1 = np.column_stack((yy1[valid_mask1], xx1[valid_mask1]))
+values1 = du_avg[valid_mask1]
+interp_points1 = np.column_stack((yy1[interp_mask1], xx1[interp_mask1]))
+interpolated_values1 = sp.interpolate.griddata(points1, values1, interp_points1, method='linear')
+du_avg_inp = du_avg.copy()
+du_avg_inp[interp_mask1] = interpolated_values1
 
 #LLJ height
 LLJ_nose=z_grid[np.nanargmax(u_avg_inp,axis=1)]
@@ -256,7 +311,7 @@ plt.xlim([-1800,7800])
 plt.ylim([0,1000])
 plt.grid()
 
-fig=plt.figure(figsize=(18,2.5))
+fig=plt.figure(figsize=(18,3))
 matplotlib.rcParams['savefig.dpi'] = 500
 gs = GridSpec(nrows=1, ncols=3, width_ratios=[1,6,0.25], figure=fig)
 
@@ -267,14 +322,14 @@ plt.plot(uw_outflow_avg,Data.height,'-m',label='Outflow')
 plt.ylim([0,1000])
 plt.xlim([-0.0001,0.00001])
 plt.xticks([-0.0001,0],labels=[r'$-10^{-4}$',r'$0$'])
-plt.ylabel(r'$y$ [m]')
+plt.ylabel(r'$z$ [m a.g.l.]')
 plt.xlabel('$\overline{u^\prime w^\prime}/U_\infty^2$')
 plt.grid()
-plt.legend()
+plt.legend(draggable=True)
 
 ax=fig.add_subplot(gs[1])
-cf=plt.contourf(x_grid,z_grid,u_avg_inp.T,np.arange(0.4,0.96,0.05),cmap='coolwarm',extend='both')
-plt.contour(x_grid,z_grid,u_avg_inp.T,np.arange(0.4,0.96,0.05),extend='both',linewidths=1,alpha=0.25,colors='k')
+cf=plt.contourf(x_grid,z_grid,u_avg_inp.T,np.arange(0.4,0.91,0.05),cmap='coolwarm',extend='both')
+plt.contour(x_grid,z_grid,u_avg_inp.T,np.arange(0.4,0.91,0.05),extend='both',linewidths=1,alpha=0.25,colors='k')
 for s in config['source_rhi']:
     plt.plot([config['turbine_x'][s],config['turbine_x'][s]],[-D/2+H,D/2+H],'k',linewidth=1)
 plt.plot(x_grid,LLJ_nose,'.k',markersize=10,markerfacecolor='w')
@@ -292,6 +347,6 @@ plt.plot([config['inflow_x'],config['inflow_x']],[0,1000],'--g',linewidth=2)
 plt.plot([config['outflow_x'],config['outflow_x']],[0,1000],'--m',linewidth=2)
 
 cax=fig.add_subplot(gs[2])
-plt.colorbar(cf,cax=cax,label='$u/U_\infty$ [m s$^{-1}$]')
+plt.colorbar(cf,cax=cax,label='$\overline{u}/U_\infty$ [m s$^{-1}$]')
 plt.tight_layout()
 
