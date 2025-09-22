@@ -168,9 +168,13 @@ if not os.path.isfile(save_name):
                     cos=np.cos(np.radians(Data_inflow.WD)).interp(time=[time_avg]).squeeze()
                     sin=np.sin(np.radians(Data_inflow.WD)).interp(time=[time_avg]).squeeze()
                     WD=np.degrees(np.arctan2(sin,cos))%360
+                else:
+                    continue
                     
-                WS_hub=WS.sel(height=z_hub).values
-                WD_hub=WD.sel(height=z_hub).values
+                U_inf=(ws_int1[files==f]+ws_int2[files==f])/2
+                cos=np.cos(np.radians(WD.sel(height=slice(H-D/2,H+D/2)).mean().values))
+                sin=np.sin(np.radians(WD.sel(height=slice(H-D/2,H+D/2)).mean().values))
+                WD_hub=np.degrees(np.arctan2(sin,cos))%360
                 
                 WS_int=np.interp(Data.z_corr.values,WS.height.values,WS.values)
                 Data['WS']=xr.DataArray(WS_int,coords=Data.z_corr.coords)
@@ -179,8 +183,8 @@ if not os.path.isfile(save_name):
                 sin=np.interp(Data.z_corr.values,WD.height.values,np.sin(np.radians(WD.values-WD_hub)))
                 Data['dWD']=xr.DataArray(np.degrees(np.arctan2(sin,cos))%360,coords=Data.z_corr.coords)
                 
-                u_eq=-Data.wind_speed/np.cos(np.radians(Data.elevation))/np.cos(np.radians(Data.dWD))/WS_hub
-                du_eq=u_eq-Data['WS']/WS_hub
+                u_eq=-Data.wind_speed/np.cos(np.radians(Data.elevation))/np.cos(np.radians(Data.dWD))/U_inf
+                du_eq=u_eq-Data['WS']/U_inf
                 
                 u=np.append(u,u_eq.values[real])
                 du=np.append(du,du_eq.values[real])
@@ -190,7 +194,7 @@ if not os.path.isfile(save_name):
                 file_inflow=glob.glob(os.path.join(config['source_prof'][inflow_site],f'*{date}*nc'))
                 if len(file_inflow)==1:
                     Data_inflow=xr.open_dataset(file_inflow[0])
-                    uw_inflow_int=Data_inflow.uw.interp(time=[time_avg]).squeeze()/WS_hub**2
+                    uw_inflow_int=Data_inflow.uw.interp(time=[time_avg]).squeeze()/U_inf**2
                     if len(uw_inflow)==0:
                         uw_inflow=uw_inflow_int.values
                     else:
@@ -199,7 +203,7 @@ if not os.path.isfile(save_name):
                 file_outflow=glob.glob(os.path.join(config['source_prof'][outflow_site],f'*{date}*nc'))
                 if len(file_outflow)==1:
                     Data_outflow=xr.open_dataset(file_outflow[0])
-                    uw_outflow_int=Data_outflow.uw.interp(time=[time_avg]).squeeze()/WS_hub**2
+                    uw_outflow_int=Data_outflow.uw.interp(time=[time_avg]).squeeze()/U_inf**2
                     if len(uw_outflow)==0:
                         uw_outflow=uw_outflow_int.values
                     else:
