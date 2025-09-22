@@ -29,7 +29,7 @@ plt.close('all')
 if len(sys.argv)==1:
     source_config=os.path.join(cd,'configs/config.yaml')
     ws_lim=[10.0,30.0]#[m/s] LLJ nose wind speed range
-    wd_lim=180.0#[deg] max misalignment
+    wd_lim=20.0#[deg] max misalignment
     ti_lim=[0.0,10.0]#[%] TI range
     llj_lim=[300.0,500.0]#[m] LLJ nose height limits
 else:
@@ -98,6 +98,8 @@ x=[]
 z=[]
 u=[]
 du=[]
+WS_inflow=[]
+WS_outflow=[]
 uw_inflow=[]
 uw_outflow=[]
 
@@ -194,19 +196,25 @@ if not os.path.isfile(save_name):
                 file_inflow=glob.glob(os.path.join(config['source_prof'][inflow_site],f'*{date}*nc'))
                 if len(file_inflow)==1:
                     Data_inflow=xr.open_dataset(file_inflow[0])
+                    WS_inflow_int=Data_inflow.WS.interp(time=[time_avg]).squeeze()/U_inf
                     uw_inflow_int=Data_inflow.uw.interp(time=[time_avg]).squeeze()/U_inf**2
                     if len(uw_inflow)==0:
+                        WS_inflow=WS_inflow_int.values
                         uw_inflow=uw_inflow_int.values
                     else:
+                        WS_inflow=np.vstack([WS_inflow,WS_inflow_int.values])
                         uw_inflow=np.vstack([uw_inflow,uw_inflow_int.values])
                     
                 file_outflow=glob.glob(os.path.join(config['source_prof'][outflow_site],f'*{date}*nc'))
                 if len(file_outflow)==1:
                     Data_outflow=xr.open_dataset(file_outflow[0])
+                    WS_outflow_int=Data_outflow.WS.interp(time=[time_avg]).squeeze()/U_inf
                     uw_outflow_int=Data_outflow.uw.interp(time=[time_avg]).squeeze()/U_inf**2
                     if len(uw_outflow)==0:
+                        WS_outflow=WS_outflow_int.values
                         uw_outflow=uw_outflow_int.values
                     else:
+                        WS_outflow=np.vstack([WS_outflow,WS_outflow_int.values])
                         uw_outflow=np.vstack([uw_outflow,uw_outflow_int.values])
                         
                 print(f'{f} done',flush=True)
@@ -249,6 +257,8 @@ if not os.path.isfile(save_name):
     Output['z']=xr.DataArray(z,coords={'index':np.arange(len(x))})
     Output['u']=xr.DataArray(u,coords={'index':np.arange(len(x))})
     Output['du']=xr.DataArray(du,coords={'index':np.arange(len(x))})
+    Output['WS_inflow']= xr.DataArray(WS_inflow, coords={'index2':np.arange(len(WS_inflow[:,0])), 'height':WS_inflow_int.height})
+    Output['WS_outflow']=xr.DataArray(WS_outflow,coords={'index2':np.arange(len(WS_outflow[:,0])),'height':WS_outflow_int.height})
     Output['uw_inflow']= xr.DataArray(uw_inflow, coords={'index2':np.arange(len(uw_inflow[:,0])), 'height':uw_inflow_int.height})
     Output['uw_outflow']=xr.DataArray(uw_outflow,coords={'index2':np.arange(len(uw_outflow[:,0])),'height':uw_outflow_int.height})
     Output.to_netcdf(save_name)
@@ -258,6 +268,9 @@ if not os.path.isfile(save_name):
 Data=xr.open_dataset(save_name)
 
 #uw stats
+WS_inflow_avg=  np.apply_along_axis(lambda x: utl.filt_stat(x,   np.nanmean,perc_lim=perc_lim), axis=0, arr=Data.WS_inflow.values)
+WS_outflow_avg= np.apply_along_axis(lambda x: utl.filt_stat(x,   np.nanmean,perc_lim=perc_lim), axis=0, arr=Data.WS_outflow.values)
+
 uw_inflow_avg=  np.apply_along_axis(lambda x: utl.filt_stat(x,   np.nanmean,perc_lim=perc_lim), axis=0, arr=Data.uw_inflow.values)
 uw_outflow_avg= np.apply_along_axis(lambda x: utl.filt_stat(x,   np.nanmean,perc_lim=perc_lim), axis=0, arr=Data.uw_outflow.values)
 
@@ -284,7 +297,9 @@ interpolated_values1 = sp.interpolate.griddata(points1, values1, interp_points1,
 u_avg_inp = u_avg.copy()
 u_avg_inp[interp_mask1] = interpolated_values1
 
-f=Data.u.where((Data.du>=min_du)*(Data.du<=max_du)).values.ravel()
+x_exp=[Data.x.values.ravel(),Data.z.values.ravel()]
+lproc=stats.statistics(config_lisboa) 
+f=Data.du.where((Data.du>=min_du)*(Data.du<=max_du)).values.ravel()
 grid,Dd,excl,du_avg,hom=lproc.calculate_statistics(x_exp,f)
 du_avg[excl]=np.nan
 
@@ -317,23 +332,23 @@ plt.grid()
 
 fig=plt.figure(figsize=(18,3))
 matplotlib.rcParams['savefig.dpi'] = 500
-gs = GridSpec(nrows=1, ncols=3, width_ratios=[1,6,0.25], figure=fig)
+gs = GridSpec(nrows=2, ncols=3, width_ratios=[1,6,0.25], figure=fig)
 
-ax=fig.add_subplot(gs[0])
+ax=fig.add_subplot(gs[0,1])
 plt.plot(Data.height*0,Data.height,'--k')
-plt.plot(uw_inflow_avg,Data.height,'-g',label='Inflow')
-plt.plot(uw_outflow_avg,Data.height,'-m',label='Outflow')
+plt.plot(WS_inflow_avg,Data.height,'-g',label='Inflow')
+plt.plot(WS_outflow_avg,Data.height,'-m',label='Outflow')
 plt.ylim([0,1000])
 plt.xlim([-0.0001,0.00001])
 plt.xticks([-0.0001,0],labels=[r'$-10^{-4}$',r'$0$'])
 plt.ylabel(r'$z$ [m a.g.l.]')
-plt.xlabel('$\overline{u^\prime w^\prime}/U_\infty^2$')
+plt.xlabel('$U/U_\infty^2$')
 plt.grid()
 plt.legend(draggable=True)
 
-ax=fig.add_subplot(gs[1])
-cf=plt.contourf(x_grid,z_grid,u_avg_inp.T,np.arange(0.4,0.91,0.05),cmap='coolwarm',extend='both')
-plt.contour(x_grid,z_grid,u_avg_inp.T,np.arange(0.4,0.91,0.05),extend='both',linewidths=1,alpha=0.25,colors='k')
+ax=fig.add_subplot(gs[0,1])
+cf=plt.contourf(x_grid,z_grid,u_avg_inp.T,np.arange(0.4,1.01,0.05),cmap='coolwarm',extend='both')
+plt.contour(x_grid,z_grid,u_avg_inp.T,np.arange(0.4,1.01,0.05),extend='both',linewidths=1,alpha=0.25,colors='k')
 for s in config['source_rhi']:
     plt.plot([config['turbine_x'][s],config['turbine_x'][s]],[-D/2+H,D/2+H],'k',linewidth=1)
 plt.plot(x_grid,LLJ_nose,'.k',markersize=10,markerfacecolor='w')
@@ -350,7 +365,41 @@ plt.grid()
 plt.plot([config['inflow_x'],config['inflow_x']],[0,1000],'--g',linewidth=2)
 plt.plot([config['outflow_x'],config['outflow_x']],[0,1000],'--m',linewidth=2)
 
-cax=fig.add_subplot(gs[2])
+cax=fig.add_subplot(gs[0,2])
 plt.colorbar(cf,cax=cax,label='$\overline{u}/U_\infty$ [m s$^{-1}$]')
+
+
+ax=fig.add_subplot(gs[1,0])
+plt.plot(Data.height*0,Data.height,'--k')
+plt.plot(uw_inflow_avg,Data.height,'-g',label='Inflow')
+plt.plot(uw_outflow_avg,Data.height,'-m',label='Outflow')
+plt.ylim([0,1000])
+plt.xlim([-0.0001,0.00001])
+plt.xticks([-0.0001,0],labels=[r'$-10^{-4}$',r'$0$'])
+plt.ylabel(r'$z$ [m a.g.l.]')
+plt.xlabel('$\overline{u^\prime w^\prime}/U_\infty^2$')
+plt.grid()
+plt.legend(draggable=True)
+
+ax=fig.add_subplot(gs[1,1])
+cf=plt.contourf(x_grid,z_grid,du_avg.T,np.arange(-0.25,0.25,0.01),cmap='seismic',extend='both')
+plt.contour(x_grid,z_grid,du_avg_inp.T,np.arange(-0.25,0.25,0.01),extend='both',linewidths=1,alpha=0.25,colors='k')
+for s in config['source_rhi']:
+    plt.plot([config['turbine_x'][s],config['turbine_x'][s]],[-D/2+H,D/2+H],'k',linewidth=1)
+plt.plot(x_grid,LLJ_nose,'.k',markersize=10,markerfacecolor='w')
+ax=plt.gca()
+ax.set_aspect('equal')
+ax.set_yticklabels([])
+plt.xlim([-1800,8100])
+plt.ylim([0,1000])
+plt.grid()
+plt.xlabel(r'$x$ [m]')
+plt.grid()
+
+plt.plot([config['inflow_x'],config['inflow_x']],[0,1000],'--g',linewidth=2)
+plt.plot([config['outflow_x'],config['outflow_x']],[0,1000],'--m',linewidth=2)
+
+cax=fig.add_subplot(gs[1,2])
+plt.colorbar(cf,cax=cax,label='$\Delta\overline{u}/U_\infty$ [m s$^{-1}$]')
 plt.tight_layout()
 
