@@ -29,7 +29,7 @@ plt.close('all')
 if len(sys.argv)==1:
     source_config=os.path.join(cd,'configs/config.yaml')
     ws_lim=[10.0,30.0]#[m/s] LLJ nose wind speed range
-    wd_lim=20.0#[deg] max misalignment
+    wd_lim=180.0#[deg] max misalignment
     ti_lim=[0.0,10.0]#[%] TI range
     llj_lim=[300.0,500.0]#[m] LLJ nose height limits
 else:
@@ -49,6 +49,7 @@ outflow_site='H'
 H=90#[m] hub height
 z_hub=110#[m] selected height for hub hight conditions
 D=127 #[m] diameter
+ele_corr=2#[deg] elevatin correction
 
 #stats
 perc_lim=[5,95]#[%] percentile limits
@@ -150,13 +151,14 @@ if not os.path.isfile(save_name):
             for f in files_sel:
                 Data=xr.open_dataset(f)
                 time_avg=(Data.time.isel(scanID=0,beamID=0)+(Data.time.isel(scanID=-1,beamID=-1)-Data.time.isel(scanID=0,beamID=0))/2).values
+                Data=Data.where(Data.qc_wind_speed==0)
                 
                 #tilt correction
-                Data['elevation']=Data.elevation+Data.pitch.median()
+                Data['elevation']=Data.elevation+Data.pitch.median()+ele_corr
                 Data['x_corr']=Data.range*np.cos(np.radians(Data.elevation))*np.cos(np.radians(90-Data.azimuth))
                 Data['z_corr']=Data.range*np.sin(np.radians(Data.elevation))+H
                 
-                Data=Data.where(Data.qc_wind_speed==0).where(np.abs(np.cos(np.radians(Data.elevation)))>min_cos)
+                Data=Data.where(np.abs(np.cos(np.radians(Data.elevation)))>min_cos)
                 real=~np.isnan(Data.x_corr+Data.z_corr+Data.wind_speed).values
                 x=np.append(x,Data.x_corr.values[real]+config['turbine_x'][s])
                 z=np.append(z,Data.z_corr.values[real])
@@ -330,17 +332,16 @@ plt.xlim([-1800,7800])
 plt.ylim([0,1000])
 plt.grid()
 
-fig=plt.figure(figsize=(18,3))
+fig=plt.figure(figsize=(18,5))
 matplotlib.rcParams['savefig.dpi'] = 500
 gs = GridSpec(nrows=2, ncols=3, width_ratios=[1,6,0.25], figure=fig)
 
-ax=fig.add_subplot(gs[0,1])
+ax=fig.add_subplot(gs[0,0])
 plt.plot(Data.height*0,Data.height,'--k')
 plt.plot(WS_inflow_avg,Data.height,'-g',label='Inflow')
 plt.plot(WS_outflow_avg,Data.height,'-m',label='Outflow')
 plt.ylim([0,1000])
-plt.xlim([-0.0001,0.00001])
-plt.xticks([-0.0001,0],labels=[r'$-10^{-4}$',r'$0$'])
+plt.xlim([0,1.5])
 plt.ylabel(r'$z$ [m a.g.l.]')
 plt.xlabel('$U/U_\infty^2$')
 plt.grid()
@@ -359,7 +360,6 @@ plt.xlim([-1800,8100])
 plt.ylim([0,1000])
 plt.grid()
 plt.xlabel(r'$x$ [m]')
-
 plt.grid()
 
 plt.plot([config['inflow_x'],config['inflow_x']],[0,1000],'--g',linewidth=2)
@@ -367,7 +367,6 @@ plt.plot([config['outflow_x'],config['outflow_x']],[0,1000],'--m',linewidth=2)
 
 cax=fig.add_subplot(gs[0,2])
 plt.colorbar(cf,cax=cax,label='$\overline{u}/U_\infty$ [m s$^{-1}$]')
-
 
 ax=fig.add_subplot(gs[1,0])
 plt.plot(Data.height*0,Data.height,'--k')
@@ -379,7 +378,6 @@ plt.xticks([-0.0001,0],labels=[r'$-10^{-4}$',r'$0$'])
 plt.ylabel(r'$z$ [m a.g.l.]')
 plt.xlabel('$\overline{u^\prime w^\prime}/U_\infty^2$')
 plt.grid()
-plt.legend(draggable=True)
 
 ax=fig.add_subplot(gs[1,1])
 cf=plt.contourf(x_grid,z_grid,du_avg.T,np.arange(-0.25,0.25,0.01),cmap='seismic',extend='both')
@@ -400,6 +398,6 @@ plt.plot([config['inflow_x'],config['inflow_x']],[0,1000],'--g',linewidth=2)
 plt.plot([config['outflow_x'],config['outflow_x']],[0,1000],'--m',linewidth=2)
 
 cax=fig.add_subplot(gs[1,2])
-plt.colorbar(cf,cax=cax,label='$\Delta\overline{u}/U_\infty$ [m s$^{-1}$]')
+plt.colorbar(cf,cax=cax,label='$\Delta\overline{u}/U_\infty$ [m s$^{-1}$]',ticks=[-0.2,-0.1,0,0.1,0.2])
 plt.tight_layout()
 
