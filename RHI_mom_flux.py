@@ -152,12 +152,12 @@ if not os.path.isfile(save_name):
                 #tilt correction
                 Data['elevation']=Data.elevation+Data.pitch.median()
                 Data['x_corr']=Data.range*np.cos(np.radians(Data.elevation))*np.cos(np.radians(90-Data.azimuth))
-                Data['z_corr']=Data.range*np.sin(np.radians(Data.elevation))
+                Data['z_corr']=Data.range*np.sin(np.radians(Data.elevation))+H
                 
                 Data=Data.where(Data.qc_wind_speed==0).where(np.abs(np.cos(np.radians(Data.elevation)))>min_cos)
                 real=~np.isnan(Data.x_corr+Data.z_corr+Data.wind_speed).values
                 x=np.append(x,Data.x_corr.values[real]+config['turbine_x'][s])
-                z=np.append(z,Data.z_corr.values[real]+H)
+                z=np.append(z,Data.z_corr.values[real])
                 
                 #inflow
                 date=os.path.basename(f).split('.')[4]
