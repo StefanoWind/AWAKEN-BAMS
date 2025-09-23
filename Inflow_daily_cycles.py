@@ -9,14 +9,29 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 from matplotlib import pyplot as plt
-import matplotlib
+import matplotlib as mpl
 from scipy import stats
 import matplotlib.gridspec as gridspec
 
-matplotlib.rcParams['font.family'] = 'serif'
-matplotlib.rcParams['mathtext.fontset'] = 'cm'
-matplotlib.rcParams['font.size'] = 16
-matplotlib.rcParams['savefig.dpi'] = 500
+mpl.rcParams.update({
+"savefig.format": "png",
+"pdf.fonttype": 42,
+"ps.fonttype": 42,
+"font.family": "serif",
+"font.serif": ["Times New Roman", "Times", "DejaVu Serif"],
+"mathtext.fontset": "custom",
+"mathtext.rm": "serif",
+"mathtext.it": "serif:italic",
+"mathtext.bf": "serif:bold",
+"axes.labelsize": 14,
+"axes.titlesize": 14,
+"xtick.labelsize": 12,
+"ytick.labelsize": 12,
+"legend.fontsize": 12,
+"lines.linewidth": 1,
+"lines.markersize": 4,
+})
+
 #%% Inputs
 source_wak='data/20240910_AWAKEN_waked.nc'#source of wake distances
 sites=['A1','A2','H']#site names

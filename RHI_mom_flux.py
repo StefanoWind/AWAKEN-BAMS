@@ -365,7 +365,7 @@ ax.set_aspect('equal')
 plt.xlim([-1800,7800])
 plt.ylim([0,1000])
 plt.grid()
-fig.savefig(os.path.join(cd,'figures',os.path.basename(save_name).replace('.nc','.all_png')))
+fig.savefig(os.path.join(cd,'figures',os.path.basename(save_name).replace('.nc','_all.png')))
 
 fig=plt.figure(figsize=(18,3.5))
 gs = GridSpec(nrows=1, ncols=4, width_ratios=[1,1,6,0.25], figure=fig)
