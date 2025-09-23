@@ -12,15 +12,29 @@ import pandas as pd
 import matplotlib.patheffects as path_effects
 import xarray as xr
 from matplotlib import pyplot as plt
-import matplotlib
+import matplotlib as mpl
 import glob
 from scipy import stats
 from matplotlib.colors import LinearSegmentedColormap
 
-matplotlib.rcParams['font.family'] = 'serif'
-matplotlib.rcParams['mathtext.fontset'] = 'cm'
-matplotlib.rcParams['font.size'] = 16
-matplotlib.rcParams['savefig.dpi'] = 500
+mpl.rcParams.update({
+"savefig.format": "pdf",
+"pdf.fonttype": 42,
+"ps.fonttype": 42,
+"font.family": "serif",
+"font.serif": ["Times New Roman", "Times", "DejaVu Serif"],
+"mathtext.fontset": "custom",
+"mathtext.rm": "serif",
+"mathtext.it": "serif:italic",
+"mathtext.bf": "serif:bold",
+"axes.labelsize": 14,
+"axes.titlesize": 14,
+"xtick.labelsize": 12,
+"ytick.labelsize": 12,
+"legend.fontsize": 12,
+"lines.linewidth": 1,
+"lines.markersize": 4,
+})
 
 #%% Inputs
 

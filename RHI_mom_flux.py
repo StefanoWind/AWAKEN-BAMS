@@ -31,11 +31,11 @@ mpl.rcParams.update({
 "mathtext.rm": "serif",
 "mathtext.it": "serif:italic",
 "mathtext.bf": "serif:bold",
-"axes.labelsize": 14,
-"axes.titlesize": 14,
-"xtick.labelsize": 12,
-"ytick.labelsize": 12,
-"legend.fontsize": 12,
+"axes.labelsize": 16,
+"axes.titlesize": 16,
+"xtick.labelsize": 14,
+"ytick.labelsize": 14,
+"legend.fontsize": 14,
 "lines.linewidth": 1,
 "lines.markersize": 4,
 })
@@ -46,7 +46,7 @@ plt.close('all')
 if len(sys.argv)==1:
     source_config=os.path.join(cd,'configs/config.yaml')
     ws_lim=[10.0,30.0]#[m/s] LLJ nose wind speed range
-    wd_lim=180.0#[deg] max misalignment
+    wd_lim=20.0#[deg] max misalignment
     ti_lim=[0.0,10.0]#[%] TI range
     llj_lim=[300.0,500.0]#[m] LLJ nose height limits
     second_correction=True
@@ -75,8 +75,8 @@ min_u=0.1 #minimum normalized wind speed
 max_u=1.5#maximum normalized wind speed
 min_du=-0.5 #minimum normalized wind speed difference
 max_du=0.5 #maximum normalized wind speed difference
-dz=400 #[m] thikcness of layer used for tilt fit
-z_max=800 #[m] max height for tilt fit
+dz=700 #[m] thikcness of layer used for tilt fit
+z_max=1000 #[m] max height for tilt fit
 max_tilt=4 #[deg] maximum tilt
 
 config_lisboa={'sigma':0.25,
@@ -286,7 +286,7 @@ if not os.path.isfile(save_name):
                 plt.xlabel(r'$x$ [m]')
                 plt.ylabel(r'$y$ [m]')
                 plt.grid()
-                plt.colorbar(label=r'$u/U_\infty$')
+                plt.colorbar(label=r'$u/U_{nose}$')
                 
                 ax=plt.subplot(2,1,2)
                 plt.scatter(Data.x_corr.values[real]+config['turbine_x'][s],Data.z_corr.values[real],s=1,c=du_eq.values[real],cmap='seismic',vmin=-0.25,vmax=0.25)
@@ -297,7 +297,7 @@ if not os.path.isfile(save_name):
                 plt.xlabel(r'$x$ [m]')
                 plt.ylabel(r'$y$ [m]')
                 plt.grid()
-                plt.colorbar(label=r'$\Delta u/U_\infty$')
+                plt.colorbar(label=r'$\Delta u/U_{nose}$')
                 
                 plt.savefig(os.path.join(cd,'figures',os.path.basename(save_name)[:-3],os.path.basename(f).replace('nc','png')))
                 plt.close()
@@ -353,7 +353,7 @@ plt.close('all')
 skip=int(np.ceil(len(Data.x)/max_plot))
 plt.figure(figsize=(18,4))
 ax=plt.subplot(2,1,1)
-plt.scatter(Data.x.values[::skip],Data.z.values[::skip],s=1,c=Data.u.values[::skip],cmap='coolwarm',vmin=0.4,vmax=1)
+plt.scatter(Data.x.values[::skip],Data.z.values[::skip],s=1,c=Data.u.values[::skip],cmap='coolwarm',vmin=0.4,vmax=1,alpha=0.1)
 ax.set_aspect('equal')
 plt.xlim([-1800,7800])
 plt.ylim([0,1000])
@@ -376,7 +376,7 @@ plt.plot(WS_outflow_avg,Data.height,'-m',label='Outflow')
 plt.ylim([0,1000])
 plt.xlim([0,1.5])
 plt.ylabel(r'$z$ [m a.g.l.]')
-plt.xlabel(r'$U/U_\infty^2$')
+plt.xlabel(r'$U/U_{nose}^2$')
 plt.grid()
 plt.legend(draggable=True)
 
@@ -388,17 +388,16 @@ plt.ylim([0,1000])
 plt.xlim([-0.0001,0.00001])
 plt.xticks([-0.0001,0],labels=[r'$-10^{-4}$',r'$0$'])
 ax.set_yticklabels([])
-plt.xlabel(r'$\overline{u^\prime w^\prime}/U_\infty^2$')
+plt.xlabel(r'$\overline{u^\prime w^\prime}/U_{nose}^2$')
 plt.grid()
 
 ax=fig.add_subplot(gs[0,2])
-cf=plt.contourf(x_grid,z_grid,u_avg_inp.T,np.arange(0.4,1.01,0.05),cmap='coolwarm',extend='both')
-plt.contour(x_grid,z_grid,u_avg_inp.T,np.arange(0.4,1.01,0.05),extend='both',linewidths=1,alpha=0.25,colors='k')
+cf=plt.contourf(x_grid,z_grid,u_avg_inp.T,np.arange(0.4,1,0.02),cmap='coolwarm',extend='both')
+plt.contour(x_grid,z_grid,u_avg_inp.T,np.arange(0.4,1,0.02),extend='both',linewidths=1,alpha=0.25,colors='k')
 plt.plot([config['inflow_x'],config['inflow_x']],[0,1000],'--g',linewidth=2)
 plt.plot([config['outflow_x'],config['outflow_x']],[0,1000],'--m',linewidth=2)
 for s in config['source_rhi']:
     plt.plot([config['turbine_x'][s],config['turbine_x'][s]],[-D/2+H,D/2+H],'k',linewidth=1)
-# plt.plot(x_grid,LLJ_nose,'.k',markersize=20,markerfacecolor='w')
 ax=plt.gca()
 ax.set_yticklabels([])
 plt.xlim([-1800,8100])
@@ -408,7 +407,7 @@ plt.xlabel(r'$x$ [m]')
 plt.grid()
 
 cax=fig.add_subplot(gs[0,3])
-plt.colorbar(cf,cax=cax,label=r'$\overline{u}/U_\infty$ [m s$^{-1}$]')
+plt.colorbar(cf,cax=cax,label=r'$\overline{u}/U_{nose}$ [m s$^{-1}$]')
 plt.tight_layout()
 plt.subplots_adjust(wspace=0.1)
 fig.savefig(os.path.join(cd,'figures',os.path.basename(save_name).replace('.nc','.png')))
