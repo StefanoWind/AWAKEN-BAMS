@@ -75,8 +75,8 @@ min_u=0.1 #minimum normalized wind speed
 max_u=1.5#maximum normalized wind speed
 min_du=-0.5 #minimum normalized wind speed difference
 max_du=0.5 #maximum normalized wind speed difference
-dz=200 #[m] thikcness of layer used for tilt fit
-z_max=500 #[m] max height for tilt fit
+dz=400 #[m] thikcness of layer used for tilt fit
+z_max=800 #[m] max height for tilt fit
 max_tilt=4 #[deg] maximum tilt
 
 config_lisboa={'sigma':0.25,
@@ -366,7 +366,7 @@ plt.xlim([-1800,7800])
 plt.ylim([0,1000])
 plt.grid()
 
-fig=plt.figure(figsize=(18,5))
+fig=plt.figure(figsize=(18,4))
 gs = GridSpec(nrows=1, ncols=4, width_ratios=[1,1,6,0.25], figure=fig)
 
 ax=fig.add_subplot(gs[0,0])
