@@ -14,6 +14,7 @@ from matplotlib.gridspec import GridSpec
 from lisboa import statistics as stats
 import matplotlib
 import scipy as sp
+from scipy.optimize import curve_fit
 import yaml
 import re
 import glob
@@ -49,7 +50,7 @@ outflow_site='H'
 H=90#[m] hub height
 z_hub=110#[m] selected height for hub hight conditions
 D=127 #[m] diameter
-ele_corr=2#[deg] elevatin correction
+# ele_corr=2#[deg] elevatin correction
 
 #stats
 perc_lim=[5,95]#[%] percentile limits
@@ -57,6 +58,8 @@ min_u=0.1 #minimum normalized wind speed
 max_u=1.5#maximum normalized wind speed
 min_du=-0.5 #minimum normalized wind speed difference
 max_du=0.5 #maximum normalized wind speed difference
+dz=200
+z_max=500
 
 config_lisboa={'sigma':0.25,
         'mins':[-1800,0],
@@ -84,6 +87,9 @@ def dates_from_files(files):
         dates=np.append(dates,np.datetime64(f'{datestr[:4]}-{datestr[4:6]}-{datestr[6:8]}T{datestr[9:11]}:{datestr[11:13]}:{datestr[13:15]}'))
     
     return dates
+
+def radial_wind_speed(ele,U,ele0):
+    return -U*np.cos(np.radians(ele+ele0))
 
 #%% Initialization
 with open(source_config, 'r') as fid:
@@ -156,13 +162,28 @@ if not os.path.isfile(save_name):
                     continue
                 time_avg=(Data.time.isel(scanID=0,beamID=0)+(Data.time.isel(scanID=-1,beamID=-1)-Data.time.isel(scanID=0,beamID=0))/2).values
                 Data=Data.where(Data.qc_wind_speed==0)
-                
+   
+                #bias correction
+                Data['wind_speed']=Data.wind_speed-config['bias'][s]
+                    
                 #tilt correction
-                Data['elevation']=Data.elevation+Data.pitch.median()+ele_corr
+                Data['elevation']=Data.elevation.transpose('range','beamID','scanID')
+                rws_sel=(Data.wind_speed.where(Data.z>z_max-dz)).values.ravel()
+                ele_sel=(Data.elevation.where(Data.z>z_max-dz)).values.ravel()
+                real=~np.isnan(rws_sel+ele_sel)
+                popt, pcov = curve_fit(radial_wind_speed, ele_sel[real],rws_sel[real], p0=[10,0])
+                print(f'Optimal elevation = {popt[1]} deg')
+                
+                Data['elevation']=Data.elevation+Data.pitch
                 Data['x_corr']=Data.range*np.cos(np.radians(Data.elevation))*np.cos(np.radians(90-Data.azimuth))
                 Data['z_corr']=Data.range*np.sin(np.radians(Data.elevation))+H
                 
                 Data=Data.where(np.abs(np.cos(np.radians(Data.elevation)))>min_cos)
+                
+                #exclude upstream wake
+                if s!='rt1':
+                    Data=Data.where((Data.x_corr>0)+(Data.z_corr>H+D/2))
+                
                 real=~np.isnan(Data.x_corr+Data.z_corr+Data.wind_speed).values
                 x=np.append(x,Data.x_corr.values[real]+config['turbine_x'][s])
                 z=np.append(z,Data.z_corr.values[real])
@@ -241,7 +262,7 @@ if not os.path.isfile(save_name):
                 plt.xlabel(r'$x$ [m]')
                 plt.ylabel(r'$y$ [m]')
                 plt.grid()
-                plt.colorbar(label=r'$u/U_\infty$ [m s$^{-1}$]')
+                plt.colorbar(label=r'$u/U_\infty$')
                 
                 ax=plt.subplot(2,1,2)
                 plt.scatter(Data.x_corr.values[real]+config['turbine_x'][s],Data.z_corr.values[real],s=1,c=du_eq.values[real],cmap='seismic',vmin=-0.25,vmax=0.25)
@@ -252,7 +273,7 @@ if not os.path.isfile(save_name):
                 plt.xlabel(r'$x$ [m]')
                 plt.ylabel(r'$y$ [m]')
                 plt.grid()
-                plt.colorbar(label=r'$\Delta u/U_\infty$ [m s$^{-1}$]')
+                plt.colorbar(label=r'$\Delta u/U_\infty$')
                 
                 plt.savefig(os.path.join(cd,'figures',os.path.basename(save_name)[:-3],os.path.basename(f).replace('nc','png')))
                 plt.close()
