@@ -78,9 +78,6 @@ max_du=0.5 #maximum normalized wind speed difference
 dz=200
 z_max=500
 max_tilt=4
-xmax_wake=5
-min_du_wake=0.1
-perc_wake=10
 
 config_lisboa={'sigma':0.25,
         'mins':[-1800,0],
@@ -237,13 +234,6 @@ if not os.path.isfile(save_name):
                 
                 u_eq=-Data.wind_speed/np.cos(np.radians(Data.elevation))/np.cos(np.radians(Data.dWD))/U_inf
                 du_eq=u_eq-Data['WS']/U_inf
-                
-                #skip if no wake
-                du_wake=np.float64(np.nanpercentile(du_eq.where((Data.x_corr>0)*(Data.x_corr<xmax_wake*D)*(Data.z_corr<H+D/2)),perc_wake))
-                print(f'Du wake = {du_wake}')
-                if du_wake>-min_du_wake:
-                    print(f'No wake, skipping file {f}')
-                    continue
                 
                 #append data
                 real=~np.isnan(Data.x_corr+Data.z_corr+Data.wind_speed).values
