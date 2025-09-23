@@ -151,16 +151,17 @@ if not os.path.isfile(save_name):
             for f in files_sel:
                 try:
                     Data=xr.open_dataset(f)
+                
+                    time_avg=(Data.time.isel(scanID=0,beamID=0)+(Data.time.isel(scanID=-1,beamID=-1)-Data.time.isel(scanID=0,beamID=0))/2).values
+                    Data=Data.where(Data.qc_wind_speed==0)
+                    
+                    #tilt correction
+                    Data['elevation']=Data.elevation+Data.pitch.median()+ele_corr
+                    Data['x_corr']=Data.range*np.cos(np.radians(Data.elevation))*np.cos(np.radians(90-Data.azimuth))
+                    Data['z_corr']=Data.range*np.sin(np.radians(Data.elevation))+H
                 except:
                     print(f'Error opening {f}')
                     continue
-                time_avg=(Data.time.isel(scanID=0,beamID=0)+(Data.time.isel(scanID=-1,beamID=-1)-Data.time.isel(scanID=0,beamID=0))/2).values
-                Data=Data.where(Data.qc_wind_speed==0)
-                
-                #tilt correction
-                Data['elevation']=Data.elevation+Data.pitch.median()+ele_corr
-                Data['x_corr']=Data.range*np.cos(np.radians(Data.elevation))*np.cos(np.radians(90-Data.azimuth))
-                Data['z_corr']=Data.range*np.sin(np.radians(Data.elevation))+H
                 
                 Data=Data.where(np.abs(np.cos(np.radians(Data.elevation)))>min_cos)
                 real=~np.isnan(Data.x_corr+Data.z_corr+Data.wind_speed).values
@@ -241,7 +242,7 @@ if not os.path.isfile(save_name):
                 plt.xlabel(r'$x$ [m]')
                 plt.ylabel(r'$y$ [m]')
                 plt.grid()
-                plt.colorbar(label='$u/U_\infty$ [m s$^{-1}$]')
+                plt.colorbar(label=r'$u/U_\infty$ [m s$^{-1}$]')
                 
                 ax=plt.subplot(2,1,2)
                 plt.scatter(Data.x_corr.values[real]+config['turbine_x'][s],Data.z_corr.values[real],s=1,c=du_eq.values[real],cmap='seismic',vmin=-0.25,vmax=0.25)
@@ -252,7 +253,7 @@ if not os.path.isfile(save_name):
                 plt.xlabel(r'$x$ [m]')
                 plt.ylabel(r'$y$ [m]')
                 plt.grid()
-                plt.colorbar(label='$\Delta u/U_\infty$ [m s$^{-1}$]')
+                plt.colorbar(label=r'$\Delta u/U_\infty$ [m s$^{-1}$]')
                 
                 plt.savefig(os.path.join(cd,'figures',os.path.basename(save_name)[:-3],os.path.basename(f).replace('nc','png')))
                 plt.close()
@@ -370,7 +371,7 @@ plt.plot([config['inflow_x'],config['inflow_x']],[0,1000],'--g',linewidth=2)
 plt.plot([config['outflow_x'],config['outflow_x']],[0,1000],'--m',linewidth=2)
 
 cax=fig.add_subplot(gs[0,2])
-plt.colorbar(cf,cax=cax,label='$\overline{u}/U_\infty$ [m s$^{-1}$]')
+plt.colorbar(cf,cax=cax,label=r'$\overline{u}/U_\infty$ [m s$^{-1}$]')
 
 ax=fig.add_subplot(gs[1,0])
 plt.plot(Data.height*0,Data.height,'--k')
