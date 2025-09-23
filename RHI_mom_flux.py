@@ -33,12 +33,14 @@ if len(sys.argv)==1:
     wd_lim=180.0#[deg] max misalignment
     ti_lim=[0.0,10.0]#[%] TI range
     llj_lim=[300.0,500.0]#[m] LLJ nose height limits
+    second_correction=True
 else:
     source_config=sys.argv[1]
     ws_lim=[np.float64(sys.argv[2]),np.float64(sys.argv[3])]
     wd_lim=np.float64(sys.argv[4])
     ti_lim=[np.float64(sys.argv[5]),np.float64(sys.argv[6])]
     llj_lim=[np.float64(sys.argv[7]),np.float64(sys.argv[8])]
+    second_correction=sys.argv[9]=='True'
 
 #fixed inputs
 source_log=os.path.join(cd,'data/glob.lidar.eventlog.avg.c2.20230101.000500.csv')#inflow table source
@@ -60,6 +62,7 @@ min_du=-0.5 #minimum normalized wind speed difference
 max_du=0.5 #maximum normalized wind speed difference
 dz=200
 z_max=500
+max_tilt=4
 
 config_lisboa={'sigma':0.25,
         'mins':[-1800,0],
@@ -166,23 +169,29 @@ if not os.path.isfile(save_name):
                 #bias correction
                 Data['wind_speed']=Data.wind_speed-config['bias'][s]
                     
-                #tilt correction
+                #first tilt correction
+                Data['elevation']=Data.elevation+Data.pitch
+                
+                #second tilt correction
                 Data['elevation']=Data.elevation.transpose('range','beamID','scanID')
                 rws_sel=(Data.wind_speed.where(Data.z>z_max-dz)).values.ravel()
                 ele_sel=(Data.elevation.where(Data.z>z_max-dz)).values.ravel()
                 real=~np.isnan(rws_sel+ele_sel)
-                popt, pcov = curve_fit(radial_wind_speed, ele_sel[real],rws_sel[real], p0=[10,0])
+                popt, pcov = curve_fit(radial_wind_speed, ele_sel[real],rws_sel[real], p0=[10,0],bounds=([0,-max_tilt],[30,max_tilt]))
                 print(f'Optimal elevation = {popt[1]} deg')
                 
-                Data['elevation']=Data.elevation+Data.pitch
+                if second_correction:
+                    Data['elevation']=Data.elevation+popt[1]
+                    
                 Data['x_corr']=Data.range*np.cos(np.radians(Data.elevation))*np.cos(np.radians(90-Data.azimuth))
                 Data['z_corr']=Data.range*np.sin(np.radians(Data.elevation))+H
                 
+                #exclude high deprojection error zone
                 Data=Data.where(np.abs(np.cos(np.radians(Data.elevation)))>min_cos)
                 
                 #exclude upstream wake
                 if s!='rt1':
-                    Data=Data.where((Data.x_corr>0)+(Data.z_corr>H+D/2))
+                    Data=Data.where((Data.x_corr>0)+(Data.z_corr>H+D))
                 
                 real=~np.isnan(Data.x_corr+Data.z_corr+Data.wind_speed).values
                 x=np.append(x,Data.x_corr.values[real]+config['turbine_x'][s])
