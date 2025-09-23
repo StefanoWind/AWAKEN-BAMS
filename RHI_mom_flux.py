@@ -149,19 +149,18 @@ if not os.path.isfile(save_name):
             print(f'{len(files_sel)} scans selected in {s}', flush=True)
             
             for f in files_sel:
-                try:
-                    Data=xr.open_dataset(f)
                 
-                    time_avg=(Data.time.isel(scanID=0,beamID=0)+(Data.time.isel(scanID=-1,beamID=-1)-Data.time.isel(scanID=0,beamID=0))/2).values
-                    Data=Data.where(Data.qc_wind_speed==0)
-                    
-                    #tilt correction
-                    Data['elevation']=Data.elevation+Data.pitch.median()+ele_corr
-                    Data['x_corr']=Data.range*np.cos(np.radians(Data.elevation))*np.cos(np.radians(90-Data.azimuth))
-                    Data['z_corr']=Data.range*np.sin(np.radians(Data.elevation))+H
-                except:
-                    print(f'Error opening {f}')
+                Data=xr.open_dataset(f)
+                if len(Data.beamID)==1:
+                    print(f'Invalid file {f}')
                     continue
+                time_avg=(Data.time.isel(scanID=0,beamID=0)+(Data.time.isel(scanID=-1,beamID=-1)-Data.time.isel(scanID=0,beamID=0))/2).values
+                Data=Data.where(Data.qc_wind_speed==0)
+                
+                #tilt correction
+                Data['elevation']=Data.elevation+Data.pitch.median()+ele_corr
+                Data['x_corr']=Data.range*np.cos(np.radians(Data.elevation))*np.cos(np.radians(90-Data.azimuth))
+                Data['z_corr']=Data.range*np.sin(np.radians(Data.elevation))+H
                 
                 Data=Data.where(np.abs(np.cos(np.radians(Data.elevation)))>min_cos)
                 real=~np.isnan(Data.x_corr+Data.z_corr+Data.wind_speed).values
