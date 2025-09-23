@@ -68,7 +68,6 @@ outflow_site='H'
 H=90#[m] hub height
 z_hub=110#[m] selected height for hub hight conditions
 D=127 #[m] diameter
-# ele_corr=2#[deg] elevatin correction
 
 #stats
 perc_lim=[5,95]#[%] percentile limits
@@ -80,7 +79,8 @@ dz=200
 z_max=500
 max_tilt=4
 xmax_wake=5
-min_du_wake=0.2
+min_du_wake=0.1
+perc_wake=10
 
 config_lisboa={'sigma':0.25,
         'mins':[-1800,0],
@@ -211,8 +211,6 @@ if not os.path.isfile(save_name):
                 if s!='rt1':
                     Data=Data.where((Data.x_corr>0)+(Data.z_corr>H+D))
                 
-               
-                
                 #inflow
                 date=os.path.basename(f).split('.')[4]
                 file_inflow=glob.glob(os.path.join(config['source_prof'][inflow_site],f'*{date}*nc'))
@@ -241,8 +239,8 @@ if not os.path.isfile(save_name):
                 du_eq=u_eq-Data['WS']/U_inf
                 
                 #skip if no wake
-                du_wake=np.float64(du_eq.where((Data.x_corr>0)*(Data.x_corr<xmax_wake*D)*(Data.z_corr<H+D/2)).median())
-                
+                du_wake=np.float64(np.nanpercentile(du_eq.where((Data.x_corr>0)*(Data.x_corr<xmax_wake*D)*(Data.z_corr<H+D/2)),perc_wake))
+                print(f'Du wake = {du_wake}')
                 if du_wake>-min_du_wake:
                     print(f'No wake, skipping file {f}')
                     continue
