@@ -149,7 +149,11 @@ if not os.path.isfile(save_name):
             print(f'{len(files_sel)} scans selected in {s}', flush=True)
             
             for f in files_sel:
-                Data=xr.open_dataset(f)
+                try:
+                    Data=xr.open_dataset(f)
+                except:
+                    print(f'Error opening {f}')
+                    continue
                 time_avg=(Data.time.isel(scanID=0,beamID=0)+(Data.time.isel(scanID=-1,beamID=-1)-Data.time.isel(scanID=0,beamID=0))/2).values
                 Data=Data.where(Data.qc_wind_speed==0)
                 
@@ -343,7 +347,7 @@ plt.plot(WS_outflow_avg,Data.height,'-m',label='Outflow')
 plt.ylim([0,1000])
 plt.xlim([0,1.5])
 plt.ylabel(r'$z$ [m a.g.l.]')
-plt.xlabel('$U/U_\infty^2$')
+plt.xlabel(r'$U/U_\infty^2$')
 plt.grid()
 plt.legend(draggable=True)
 
@@ -376,7 +380,7 @@ plt.ylim([0,1000])
 plt.xlim([-0.0001,0.00001])
 plt.xticks([-0.0001,0],labels=[r'$-10^{-4}$',r'$0$'])
 plt.ylabel(r'$z$ [m a.g.l.]')
-plt.xlabel('$\overline{u^\prime w^\prime}/U_\infty^2$')
+plt.xlabel(r'$\overline{u^\prime w^\prime}/U_\infty^2$')
 plt.grid()
 
 ax=fig.add_subplot(gs[1,1])
@@ -398,6 +402,6 @@ plt.plot([config['inflow_x'],config['inflow_x']],[0,1000],'--g',linewidth=2)
 plt.plot([config['outflow_x'],config['outflow_x']],[0,1000],'--m',linewidth=2)
 
 cax=fig.add_subplot(gs[1,2])
-plt.colorbar(cf,cax=cax,label='$\Delta\overline{u}/U_\infty$ [m s$^{-1}$]',ticks=[-0.2,-0.1,0,0.1,0.2])
+plt.colorbar(cf,cax=cax,label=r'$\Delta\overline{u}/U_\infty$ [m s$^{-1}$]',ticks=[-0.2,-0.1,0,0.1,0.2])
 plt.tight_layout()
 
