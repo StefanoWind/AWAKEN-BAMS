@@ -12,7 +12,7 @@ import xarray as xr
 from matplotlib import pyplot as plt
 from matplotlib.gridspec import GridSpec
 from lisboa import statistics as stats
-import matplotlib
+import matplotlib as mpl
 import scipy as sp
 from scipy.optimize import curve_fit
 import yaml
@@ -20,10 +20,26 @@ import re
 import glob
 import warnings
 warnings.filterwarnings('ignore')
-matplotlib.rcParams['font.family'] = 'serif'
-matplotlib.rcParams['mathtext.fontset'] = 'cm'
-matplotlib.rcParams['font.size'] = 18
-matplotlib.rcParams['savefig.dpi'] = 500
+
+mpl.rcParams.update({
+"savefig.format": "pdf",
+"pdf.fonttype": 42,
+"ps.fonttype": 42,
+"font.family": "serif",
+"font.serif": ["Times New Roman", "Times", "DejaVu Serif"],
+"mathtext.fontset": "custom",
+"mathtext.rm": "serif",
+"mathtext.it": "serif:italic",
+"mathtext.bf": "serif:bold",
+"axes.labelsize": 14,
+"axes.titlesize": 14,
+"xtick.labelsize": 12,
+"ytick.labelsize": 12,
+"legend.fontsize": 12,
+"lines.linewidth": 1,
+"lines.markersize": 4,
+})
+
 plt.close('all')
 
 #%% Inputs
@@ -63,6 +79,8 @@ max_du=0.5 #maximum normalized wind speed difference
 dz=200
 z_max=500
 max_tilt=4
+xmax_wake=5
+min_du_wake=0.2
 
 config_lisboa={'sigma':0.25,
         'mins':[-1800,0],
@@ -193,9 +211,7 @@ if not os.path.isfile(save_name):
                 if s!='rt1':
                     Data=Data.where((Data.x_corr>0)+(Data.z_corr>H+D))
                 
-                real=~np.isnan(Data.x_corr+Data.z_corr+Data.wind_speed).values
-                x=np.append(x,Data.x_corr.values[real]+config['turbine_x'][s])
-                z=np.append(z,Data.z_corr.values[real])
+               
                 
                 #inflow
                 date=os.path.basename(f).split('.')[4]
@@ -224,6 +240,17 @@ if not os.path.isfile(save_name):
                 u_eq=-Data.wind_speed/np.cos(np.radians(Data.elevation))/np.cos(np.radians(Data.dWD))/U_inf
                 du_eq=u_eq-Data['WS']/U_inf
                 
+                #skip if no wake
+                du_wake=np.float64(du_eq.where((Data.x_corr>0)*(Data.x_corr<xmax_wake*D)*(Data.z_corr<H+D/2)).median())
+                
+                if du_wake>-min_du_wake:
+                    print(f'No wake, skipping file {f}')
+                    continue
+                
+                #append data
+                real=~np.isnan(Data.x_corr+Data.z_corr+Data.wind_speed).values
+                x=np.append(x,Data.x_corr.values[real]+config['turbine_x'][s])
+                z=np.append(z,Data.z_corr.values[real])
                 u=np.append(u,u_eq.values[real])
                 du=np.append(du,du_eq.values[real])
                 
@@ -333,33 +360,40 @@ interpolated_values1 = sp.interpolate.griddata(points1, values1, interp_points1,
 u_avg_inp = u_avg.copy()
 u_avg_inp[interp_mask1] = interpolated_values1
 
-x_exp=[Data.x.values.ravel(),Data.z.values.ravel()]
-lproc=stats.statistics(config_lisboa) 
-f=Data.du.where((Data.du>=min_du)*(Data.du<=max_du)).values.ravel()
-grid,Dd,excl,du_avg,hom=lproc.calculate_statistics(x_exp,f)
-du_avg[excl]=np.nan
+# x_exp=[Data.x.values.ravel(),Data.z.values.ravel()]
+# lproc=stats.statistics(config_lisboa) 
+# f=Data.du.where((Data.du>=min_du)*(Data.du<=max_du)).values.ravel()
+# grid,Dd,excl,du_avg,hom=lproc.calculate_statistics(x_exp,f)
+# du_avg[excl]=np.nan
 
-#inpainting
-interp_limit = 5
-valid_mask1 = ~np.isnan(du_avg)
-distance1 = sp.ndimage.distance_transform_edt(~valid_mask1)
-interp_mask1 = (np.isnan(du_avg)) & (distance1 <= interp_limit)
-yy1, xx1 = np.indices(du_avg.shape)
-points1 = np.column_stack((yy1[valid_mask1], xx1[valid_mask1]))
-values1 = du_avg[valid_mask1]
-interp_points1 = np.column_stack((yy1[interp_mask1], xx1[interp_mask1]))
-interpolated_values1 = sp.interpolate.griddata(points1, values1, interp_points1, method='linear')
-du_avg_inp = du_avg.copy()
-du_avg_inp[interp_mask1] = interpolated_values1
+# #inpainting
+# interp_limit = 5
+# valid_mask1 = ~np.isnan(du_avg)
+# distance1 = sp.ndimage.distance_transform_edt(~valid_mask1)
+# interp_mask1 = (np.isnan(du_avg)) & (distance1 <= interp_limit)
+# yy1, xx1 = np.indices(du_avg.shape)
+# points1 = np.column_stack((yy1[valid_mask1], xx1[valid_mask1]))
+# values1 = du_avg[valid_mask1]
+# interp_points1 = np.column_stack((yy1[interp_mask1], xx1[interp_mask1]))
+# interpolated_values1 = sp.interpolate.griddata(points1, values1, interp_points1, method='linear')
+# du_avg_inp = du_avg.copy()
+# du_avg_inp[interp_mask1] = interpolated_values1
 
-#LLJ height
-LLJ_nose=z_grid[np.nanargmax(u_avg_inp,axis=1)]
+# #LLJ height
+# LLJ_nose=z_grid[np.nanargmax(u_avg_inp,axis=1)]
 
 #%% Plots
 plt.close('all')
 skip=int(np.ceil(len(Data.x)/max_plot))
 plt.figure(figsize=(18,4))
-plt.scatter(Data.x.values[::skip],Data.z.values[::skip],s=1,c=Data.u.values[::skip],cmap='coolwarm',vmin=0.5,vmax=0.95)
+ax=plt.subplot(2,1,1)
+plt.scatter(Data.x.values[::skip],Data.z.values[::skip],s=1,c=Data.u.values[::skip],cmap='coolwarm',vmin=0.4,vmax=1)
+ax.set_aspect('equal')
+plt.xlim([-1800,7800])
+plt.ylim([0,1000])
+plt.grid()
+ax=plt.subplot(2,1,2)
+plt.pcolor(x_grid,z_grid,u_avg.T,cmap='coolwarm',vmin=0.4,vmax=1)
 ax=plt.gca()
 ax.set_aspect('equal')
 plt.xlim([-1800,7800])
@@ -367,8 +401,7 @@ plt.ylim([0,1000])
 plt.grid()
 
 fig=plt.figure(figsize=(18,5))
-matplotlib.rcParams['savefig.dpi'] = 500
-gs = GridSpec(nrows=2, ncols=3, width_ratios=[1,6,0.25], figure=fig)
+gs = GridSpec(nrows=1, ncols=4, width_ratios=[1,1,6,0.25], figure=fig)
 
 ax=fig.add_subplot(gs[0,0])
 plt.plot(Data.height*0,Data.height,'--k')
@@ -382,45 +415,25 @@ plt.grid()
 plt.legend(draggable=True)
 
 ax=fig.add_subplot(gs[0,1])
-cf=plt.contourf(x_grid,z_grid,u_avg_inp.T,np.arange(0.4,1.01,0.05),cmap='coolwarm',extend='both')
-plt.contour(x_grid,z_grid,u_avg_inp.T,np.arange(0.4,1.01,0.05),extend='both',linewidths=1,alpha=0.25,colors='k')
-for s in config['source_rhi']:
-    plt.plot([config['turbine_x'][s],config['turbine_x'][s]],[-D/2+H,D/2+H],'k',linewidth=1)
-plt.plot(x_grid,LLJ_nose,'.k',markersize=10,markerfacecolor='w')
-ax=plt.gca()
-ax.set_aspect('equal')
-ax.set_yticklabels([])
-plt.xlim([-1800,8100])
-plt.ylim([0,1000])
-plt.grid()
-plt.xlabel(r'$x$ [m]')
-plt.grid()
-
-plt.plot([config['inflow_x'],config['inflow_x']],[0,1000],'--g',linewidth=2)
-plt.plot([config['outflow_x'],config['outflow_x']],[0,1000],'--m',linewidth=2)
-
-cax=fig.add_subplot(gs[0,2])
-plt.colorbar(cf,cax=cax,label=r'$\overline{u}/U_\infty$ [m s$^{-1}$]')
-
-ax=fig.add_subplot(gs[1,0])
 plt.plot(Data.height*0,Data.height,'--k')
 plt.plot(uw_inflow_avg,Data.height,'-g',label='Inflow')
 plt.plot(uw_outflow_avg,Data.height,'-m',label='Outflow')
 plt.ylim([0,1000])
 plt.xlim([-0.0001,0.00001])
 plt.xticks([-0.0001,0],labels=[r'$-10^{-4}$',r'$0$'])
-plt.ylabel(r'$z$ [m a.g.l.]')
+ax.set_yticklabels([])
 plt.xlabel(r'$\overline{u^\prime w^\prime}/U_\infty^2$')
 plt.grid()
 
-ax=fig.add_subplot(gs[1,1])
-cf=plt.contourf(x_grid,z_grid,du_avg.T,np.arange(-0.25,0.25,0.01),cmap='seismic',extend='both')
-plt.contour(x_grid,z_grid,du_avg_inp.T,np.arange(-0.25,0.25,0.01),extend='both',linewidths=1,alpha=0.25,colors='k')
+ax=fig.add_subplot(gs[0,2])
+cf=plt.contourf(x_grid,z_grid,u_avg_inp.T,np.arange(0.4,1.01,0.05),cmap='coolwarm',extend='both')
+plt.contour(x_grid,z_grid,u_avg_inp.T,np.arange(0.4,1.01,0.05),extend='both',linewidths=1,alpha=0.25,colors='k')
+plt.plot([config['inflow_x'],config['inflow_x']],[0,1000],'--g',linewidth=2)
+plt.plot([config['outflow_x'],config['outflow_x']],[0,1000],'--m',linewidth=2)
 for s in config['source_rhi']:
     plt.plot([config['turbine_x'][s],config['turbine_x'][s]],[-D/2+H,D/2+H],'k',linewidth=1)
-plt.plot(x_grid,LLJ_nose,'.k',markersize=10,markerfacecolor='w')
+# plt.plot(x_grid,LLJ_nose,'.k',markersize=20,markerfacecolor='w')
 ax=plt.gca()
-ax.set_aspect('equal')
 ax.set_yticklabels([])
 plt.xlim([-1800,8100])
 plt.ylim([0,1000])
@@ -428,10 +441,9 @@ plt.grid()
 plt.xlabel(r'$x$ [m]')
 plt.grid()
 
-plt.plot([config['inflow_x'],config['inflow_x']],[0,1000],'--g',linewidth=2)
-plt.plot([config['outflow_x'],config['outflow_x']],[0,1000],'--m',linewidth=2)
-
-cax=fig.add_subplot(gs[1,2])
-plt.colorbar(cf,cax=cax,label=r'$\Delta\overline{u}/U_\infty$ [m s$^{-1}$]',ticks=[-0.2,-0.1,0,0.1,0.2])
+cax=fig.add_subplot(gs[0,3])
+plt.colorbar(cf,cax=cax,label=r'$\overline{u}/U_\infty$ [m s$^{-1}$]')
 plt.tight_layout()
+fig.savefig(os.path.join(cd,'figures',os.path.basename(save_name).replace('.nc','.png')))
+
 
