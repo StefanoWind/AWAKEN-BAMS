@@ -75,9 +75,9 @@ min_u=0.1 #minimum normalized wind speed
 max_u=1.5#maximum normalized wind speed
 min_du=-0.5 #minimum normalized wind speed difference
 max_du=0.5 #maximum normalized wind speed difference
-dz=200
-z_max=500
-max_tilt=4
+dz=200 #[m] thikcness of layer used for tilt fit
+z_max=500 #[m] max height for tilt fit
+max_tilt=4 #[deg] maximum tilt
 
 config_lisboa={'sigma':0.25,
         'mins':[-1800,0],
@@ -189,8 +189,8 @@ if not os.path.isfile(save_name):
                 
                 #second tilt correction
                 Data['elevation']=Data.elevation.transpose('range','beamID','scanID')
-                rws_sel=(Data.wind_speed.where(Data.z>z_max-dz)).values.ravel()
-                ele_sel=(Data.elevation.where(Data.z>z_max-dz)).values.ravel()
+                rws_sel=(Data.wind_speed.where(Data.z>z_max-dz).where(Data.z<z_max)).values.ravel()
+                ele_sel=(Data.elevation.where(Data.z>z_max-dz).where(Data.z<z_max)).values.ravel()
                 real=~np.isnan(rws_sel+ele_sel)
                 popt, pcov = curve_fit(radial_wind_speed, ele_sel[real],rws_sel[real], p0=[10,0],bounds=([0,-max_tilt],[30,max_tilt]))
                 print(f'Optimal elevation = {popt[1]} deg')
@@ -348,28 +348,6 @@ interpolated_values1 = sp.interpolate.griddata(points1, values1, interp_points1,
 u_avg_inp = u_avg.copy()
 u_avg_inp[interp_mask1] = interpolated_values1
 
-# x_exp=[Data.x.values.ravel(),Data.z.values.ravel()]
-# lproc=stats.statistics(config_lisboa) 
-# f=Data.du.where((Data.du>=min_du)*(Data.du<=max_du)).values.ravel()
-# grid,Dd,excl,du_avg,hom=lproc.calculate_statistics(x_exp,f)
-# du_avg[excl]=np.nan
-
-# #inpainting
-# interp_limit = 5
-# valid_mask1 = ~np.isnan(du_avg)
-# distance1 = sp.ndimage.distance_transform_edt(~valid_mask1)
-# interp_mask1 = (np.isnan(du_avg)) & (distance1 <= interp_limit)
-# yy1, xx1 = np.indices(du_avg.shape)
-# points1 = np.column_stack((yy1[valid_mask1], xx1[valid_mask1]))
-# values1 = du_avg[valid_mask1]
-# interp_points1 = np.column_stack((yy1[interp_mask1], xx1[interp_mask1]))
-# interpolated_values1 = sp.interpolate.griddata(points1, values1, interp_points1, method='linear')
-# du_avg_inp = du_avg.copy()
-# du_avg_inp[interp_mask1] = interpolated_values1
-
-# #LLJ height
-# LLJ_nose=z_grid[np.nanargmax(u_avg_inp,axis=1)]
-
 #%% Plots
 plt.close('all')
 skip=int(np.ceil(len(Data.x)/max_plot))
@@ -432,6 +410,7 @@ plt.grid()
 cax=fig.add_subplot(gs[0,3])
 plt.colorbar(cf,cax=cax,label=r'$\overline{u}/U_\infty$ [m s$^{-1}$]')
 plt.tight_layout()
+plt.subplots_adjust(wspace=0.1)
 fig.savefig(os.path.join(cd,'figures',os.path.basename(save_name).replace('.nc','.png')))
 
 
