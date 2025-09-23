@@ -22,7 +22,8 @@ import warnings
 warnings.filterwarnings('ignore')
 
 mpl.rcParams.update({
-"savefig.format": "pdf",
+"savefig.format": "png",
+"savefig.dpi":500,
 "pdf.fonttype": 42,
 "ps.fonttype": 42,
 "font.family": "serif",
@@ -75,8 +76,7 @@ min_u=0.1 #minimum normalized wind speed
 max_u=1.5#maximum normalized wind speed
 min_du=-0.5 #minimum normalized wind speed difference
 max_du=0.5 #maximum normalized wind speed difference
-dz=700 #[m] thikcness of layer used for tilt fit
-z_max=1000 #[m] max height for tilt fit
+zmin=300 #[m] min height for tilt fit
 max_tilt=4 #[deg] maximum tilt
 
 config_lisboa={'sigma':0.25,
@@ -189,8 +189,8 @@ if not os.path.isfile(save_name):
                 
                 #second tilt correction
                 Data['elevation']=Data.elevation.transpose('range','beamID','scanID')
-                rws_sel=(Data.wind_speed.where(Data.z>z_max-dz).where(Data.z<z_max)).values.ravel()
-                ele_sel=(Data.elevation.where(Data.z>z_max-dz).where(Data.z<z_max)).values.ravel()
+                rws_sel=(Data.wind_speed.where(Data.z>zmin)).values.ravel()
+                ele_sel=(Data.elevation.where(Data.z>zmin)).values.ravel()
                 real=~np.isnan(rws_sel+ele_sel)
                 popt, pcov = curve_fit(radial_wind_speed, ele_sel[real],rws_sel[real], p0=[10,0],bounds=([0,-max_tilt],[30,max_tilt]))
                 print(f'Optimal elevation = {popt[1]} deg')
@@ -351,7 +351,7 @@ u_avg_inp[interp_mask1] = interpolated_values1
 #%% Plots
 plt.close('all')
 skip=int(np.ceil(len(Data.x)/max_plot))
-plt.figure(figsize=(18,4))
+fig=plt.figure(figsize=(18,4))
 ax=plt.subplot(2,1,1)
 plt.scatter(Data.x.values[::skip],Data.z.values[::skip],s=1,c=Data.u.values[::skip],cmap='coolwarm',vmin=0.4,vmax=1,alpha=0.1)
 ax.set_aspect('equal')
@@ -365,12 +365,12 @@ ax.set_aspect('equal')
 plt.xlim([-1800,7800])
 plt.ylim([0,1000])
 plt.grid()
+fig.savefig(os.path.join(cd,'figures',os.path.basename(save_name).replace('.nc','.all_png')))
 
-fig=plt.figure(figsize=(18,4))
+fig=plt.figure(figsize=(18,3.5))
 gs = GridSpec(nrows=1, ncols=4, width_ratios=[1,1,6,0.25], figure=fig)
 
 ax=fig.add_subplot(gs[0,0])
-plt.plot(Data.height*0,Data.height,'--k')
 plt.plot(WS_inflow_avg,Data.height,'-g',label='Inflow')
 plt.plot(WS_outflow_avg,Data.height,'-m',label='Outflow')
 plt.ylim([0,1000])
@@ -378,18 +378,17 @@ plt.xlim([0,1.5])
 plt.ylabel(r'$z$ [m a.g.l.]')
 plt.xlabel(r'$U/U_{nose}^2$')
 plt.grid()
-plt.legend(draggable=True)
 
 ax=fig.add_subplot(gs[0,1])
-plt.plot(Data.height*0,Data.height,'--k')
 plt.plot(uw_inflow_avg,Data.height,'-g',label='Inflow')
 plt.plot(uw_outflow_avg,Data.height,'-m',label='Outflow')
 plt.ylim([0,1000])
 plt.xlim([-0.0001,0.00001])
-plt.xticks([-0.0001,0],labels=[r'$-10^{-4}$',r'$0$'])
+plt.xticks([-0.0001,-0.00005,0],labels=[r'$-10^{-4}$',r'$-5\cdot 10^{-5}$',r'$0$'])
 ax.set_yticklabels([])
 plt.xlabel(r'$\overline{u^\prime w^\prime}/U_{nose}^2$')
 plt.grid()
+plt.legend(loc='upper left')
 
 ax=fig.add_subplot(gs[0,2])
 cf=plt.contourf(x_grid,z_grid,u_avg_inp.T,np.arange(0.4,1,0.02),cmap='coolwarm',extend='both')
