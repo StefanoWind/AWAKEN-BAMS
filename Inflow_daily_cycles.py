@@ -15,6 +15,7 @@ import matplotlib.gridspec as gridspec
 
 mpl.rcParams.update({
 "savefig.format": "png",
+"savefig.dpi":500,
 "pdf.fonttype": 42,
 "ps.fonttype": 42,
 "font.family": "serif",
@@ -23,11 +24,11 @@ mpl.rcParams.update({
 "mathtext.rm": "serif",
 "mathtext.it": "serif:italic",
 "mathtext.bf": "serif:bold",
-"axes.labelsize": 14,
-"axes.titlesize": 14,
-"xtick.labelsize": 12,
-"ytick.labelsize": 12,
-"legend.fontsize": 12,
+"axes.labelsize": 16,
+"axes.titlesize": 16,
+"xtick.labelsize": 14,
+"ytick.labelsize": 14,
+"legend.fontsize": 14,
 "lines.linewidth": 1,
 "lines.markersize": 4,
 })
@@ -225,7 +226,7 @@ for wd1,wd2 in zip(bin_wd[:-1],bin_wd[1:]):
 #%% Plots
 plt.close('all')
 
-matplotlib.rcParams['font.size'] = 20
+# matplotlib.rcParams['font.size'] = 20
 # all
 fig=plt.figure(figsize=(16,4))
 ctr=0
@@ -236,6 +237,7 @@ for v in variables:
     plt.ylabel(r'$z$ [m a.g.l.]')
     plt.xlabel('Hour (UTC)')
     ax.set_xticks([0,6,12,18,24])
+    ax.set_xticklabels(['0000','0600','1200','1800','2400'])
     cbar=fig.colorbar(cf,label=labels[v])
     cbar.set_ticks(ticks[v][::2])
     cbar.set_ticklabels(ticklabels[v][::2])
@@ -243,7 +245,7 @@ for v in variables:
     ctr+=1
   
 #special TKE figure
-matplotlib.rcParams['font.size'] = 16
+# matplotlib.rcParams['font.size'] = 16
 fig=plt.figure(figsize=(16,8))
 v='TKE log'
 ax=plt.subplot(2,2,4)
@@ -251,6 +253,7 @@ cf=plt.contourf(hour_avg,ALL_avg['tot'].height,ALL_avg['tot'][v].T,ticks[v],cmap
 plt.contour(hour_avg,ALL_avg['tot'].height,ALL_avg['tot'][v].T,ticks[v],colors='k',linewidths=0.5,linestyles='solid',alpha=0.5)
 plt.ylabel(r'$z$ [m a.g.l.]')
 ax.set_xticks([0,6,12,18,24])
+ax.set_xticklabels(['0000','0600','1200','1800','2400'])
 plt.xlabel('Hour (UTC)')
 plt.xlim([0,24])
 plt.ylim([0,2000])
@@ -262,7 +265,7 @@ plt.tight_layout()
 plt.grid()
 
 #month/direction
-matplotlib.rcParams['font.size'] = 16
+# matplotlib.rcParams['font.size'] = 16
 for v in variables:
     fig=plt.figure(figsize=(16,8))
     gs = gridspec.GridSpec(len(month_name), 3, width_ratios=[1,1,0.05])  # 0.1 row for the colorbars
@@ -277,6 +280,7 @@ for v in variables:
         plt.text(0.3,1600,mn,fontweight='bold',bbox={'alpha':0.25,'facecolor':'w'})
    
         ax.set_xticks([0,6,12,18,24])
+        ax.set_xticklabels(['0000','0600','1200','1800','2400'])
         if ctr==len(month_name)-1:
             plt.xlabel('Hour (UTC)')
         else:
@@ -292,6 +296,7 @@ for v in variables:
         plt.contour(hour_avg,ALL_avg[wdn].height,ALL_avg[wdn][v].T,ticks[v],colors='k',linewidths=0.5,linestyles='solid',alpha=0.5)
         plt.text(0.3,1600,wdn,fontweight='bold',bbox={'alpha':0.25,'facecolor':'w'})
         ax.set_xticks([0,6,12,18,24])
+        ax.set_xticklabels(['0000','0600','1200','1800','2400'])
         if ctr==len(month_name)-1:
             plt.xlabel('Hour (UTC)')
         else:

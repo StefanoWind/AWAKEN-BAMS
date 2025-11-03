@@ -32,11 +32,11 @@ mpl.rcParams.update({
 "mathtext.rm": "serif",
 "mathtext.it": "serif:italic",
 "mathtext.bf": "serif:bold",
-"axes.labelsize": 16,
-"axes.titlesize": 16,
-"xtick.labelsize": 14,
-"ytick.labelsize": 14,
-"legend.fontsize": 14,
+"axes.labelsize": 18,
+"axes.titlesize": 18,
+"xtick.labelsize": 16,
+"ytick.labelsize": 16,
+"legend.fontsize": 16,
 "lines.linewidth": 1,
 "lines.markersize": 4,
 })
@@ -80,11 +80,11 @@ zmin=300 #[m] min height for tilt fit
 max_tilt=4 #[deg] maximum tilt
 
 config_lisboa={'sigma':0.25,
-        'mins':[-1800,0],
+        'mins':[-1800,H],
         'maxs':[8250,1000],
         'Dn0':[127*4,127],
         'r_max':3,
-        'dist_edge':1,
+        'dist_edge':3,
         'tol_dist':0.1,
         'grid_factor':0.25,
         'max_Dd':1,
@@ -336,7 +336,7 @@ z_grid=grid[1]
 u_avg[excl]=np.nan
 
 #inpainting
-interp_limit = 5
+interp_limit = 1
 valid_mask1 = ~np.isnan(u_avg)
 distance1 = sp.ndimage.distance_transform_edt(~valid_mask1)
 interp_mask1 = (np.isnan(u_avg)) & (distance1 <= interp_limit)
@@ -351,21 +351,23 @@ u_avg_inp[interp_mask1] = interpolated_values1
 #%% Plots
 plt.close('all')
 skip=int(np.ceil(len(Data.x)/max_plot))
-fig=plt.figure(figsize=(18,4))
+fig=plt.figure(figsize=(18,7))
 ax=plt.subplot(2,1,1)
 plt.scatter(Data.x.values[::skip],Data.z.values[::skip],s=1,c=Data.u.values[::skip],cmap='coolwarm',vmin=0.4,vmax=1,alpha=0.1)
-ax.set_aspect('equal')
-plt.xlim([-1800,7800])
+plt.xlim([-1800,8100])
 plt.ylim([0,1000])
 plt.grid()
+for s in config['source_rhi']:
+    plt.plot([config['turbine_x'][s],config['turbine_x'][s]],[-D/2+H,D/2+H],'k',linewidth=1)
 ax=plt.subplot(2,1,2)
 plt.pcolor(x_grid,z_grid,u_avg.T,cmap='coolwarm',vmin=0.4,vmax=1)
 ax=plt.gca()
-ax.set_aspect('equal')
-plt.xlim([-1800,7800])
+plt.xlim([-1800,8100])
 plt.ylim([0,1000])
 plt.grid()
 fig.savefig(os.path.join(cd,'figures',os.path.basename(save_name).replace('.nc','_all.png')))
+for s in config['source_rhi']:
+    plt.plot([config['turbine_x'][s],config['turbine_x'][s]],[-D/2+H,D/2+H],'k',linewidth=1)
 
 fig=plt.figure(figsize=(18,3.5))
 gs = GridSpec(nrows=1, ncols=4, width_ratios=[1,1,6,0.25], figure=fig)
@@ -374,9 +376,10 @@ ax=fig.add_subplot(gs[0,0])
 plt.plot(WS_inflow_avg,Data.height,'-g',label='Inflow')
 plt.plot(WS_outflow_avg,Data.height,'-m',label='Outflow')
 plt.ylim([0,1000])
-plt.xlim([0,1.5])
+plt.xlim([0,1.1])
+plt.xticks([0,0.5,1])
 plt.ylabel(r'$z$ [m a.g.l.]')
-plt.xlabel(r'$U/U_{nose}^2$')
+plt.xlabel(r'$U/U_{nose}$')
 plt.grid()
 
 ax=fig.add_subplot(gs[0,1])
@@ -384,11 +387,11 @@ plt.plot(uw_inflow_avg,Data.height,'-g',label='Inflow')
 plt.plot(uw_outflow_avg,Data.height,'-m',label='Outflow')
 plt.ylim([0,1000])
 plt.xlim([-0.0001,0.00001])
-plt.xticks([-0.0001,-0.00005,0],labels=[r'$-10^{-4}$',r'$-5\cdot 10^{-5}$',r'$0$'])
+plt.xticks([-0.0001,-0.00005,0],labels=[r'$-1$',r'$-0.5$',r'$0$'])
 ax.set_yticklabels([])
-plt.xlabel(r'$\overline{u^\prime w^\prime}/U_{nose}^2$')
+plt.xlabel(r'$\overline{u^\prime w^\prime}/U_{nose}^2\cdot 10^4$')
 plt.grid()
-plt.legend(loc='upper left')
+plt.legend(loc='upper left',draggable=True)
 
 ax=fig.add_subplot(gs[0,2])
 cf=plt.contourf(x_grid,z_grid,u_avg_inp.T,np.arange(0.4,1,0.02),cmap='coolwarm',extend='both')
@@ -406,7 +409,7 @@ plt.xlabel(r'$x$ [m]')
 plt.grid()
 
 cax=fig.add_subplot(gs[0,3])
-plt.colorbar(cf,cax=cax,label=r'$\overline{u}/U_{nose}$ [m s$^{-1}$]')
+plt.colorbar(cf,cax=cax,label=r'$U/U_{nose}$ [m s$^{-1}$]')
 plt.tight_layout()
 plt.subplots_adjust(wspace=0.1)
 fig.savefig(os.path.join(cd,'figures',os.path.basename(save_name).replace('.nc','.png')))

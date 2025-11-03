@@ -123,7 +123,7 @@ for x,y,D,H in zip(Turbines.x_utm.values-x_ref,
                    Turbines.Diameter.values,
                    Turbines['Hub height'].values):
     if x>xlim[0] and x<xlim[1] and y>ylim[0] and y<ylim[1]:
-        draw_turbine_3d(ax, x, y, H, D, H, 180)
+        draw_turbine_3d(ax, x, y, H*2, D*2, H*2, 180)
 
 E,R=np.meshgrid(np.arange(0,181,3),np.arange(0,1000,10))
 x_rhi=R*0

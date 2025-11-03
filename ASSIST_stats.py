@@ -9,14 +9,29 @@ import utils as utl
 import yaml
 import xarray as xr
 from matplotlib import pyplot as plt
-import matplotlib
+import matplotlib as mpl
 from scipy import stats
 import glob
 
-matplotlib.rcParams['font.family'] = 'serif'
-matplotlib.rcParams['mathtext.fontset'] = 'cm'
-matplotlib.rcParams['font.size'] = 16
-matplotlib.rcParams['savefig.dpi'] = 500
+mpl.rcParams.update({
+"savefig.format": "png",
+"savefig.dpi":500,
+"pdf.fonttype": 42,
+"ps.fonttype": 42,
+"font.family": "serif",
+"font.serif": ["Times New Roman", "Times", "DejaVu Serif"],
+"mathtext.fontset": "custom",
+"mathtext.rm": "serif",
+"mathtext.it": "serif:italic",
+"mathtext.bf": "serif:bold",
+"axes.labelsize": 16,
+"axes.titlesize": 16,
+"xtick.labelsize": 14,
+"ytick.labelsize": 14,
+"legend.fontsize": 14,
+"lines.linewidth": 1,
+"lines.markersize": 4,
+})
 plt.close('all')
 
 #%% Inputs
@@ -47,7 +62,7 @@ max_err={'temperature':4,'waterVapor':2,'dtheta_v_dz':0.01,'pblh':0.1}#maximum 9
 variables=['temperature','waterVapor','dtheta_v_dz','pblh']
 
 #graphics
-labels={'temperature':r'$T$ [$^\circ$C]','waterVapor':r'$r$ [g Kg$^{-1}$]','dtheta_v_dz':r'$\frac{\partial{\theta_v}}{\partial z}$ [$^\circ$C m$^{-1}$]'}
+labels={'temperature':r'$T$ [$^\circ$C]','waterVapor':r'$r$ [g Kg$^{-1}$]','dtheta_v_dz':r'$\partial{\theta_v}~\partial z^{-1}$ [$^\circ$C m$^{-1}$]'}
 ticks={'temperature':np.arange(10,22.1,0.5),'waterVapor':np.arange(4,9.1,0.25),'dtheta_v_dz':np.arange(-0.1,0.11,0.005)}
 colormaps={'temperature':'coolwarm','waterVapor':'Blues','dtheta_v_dz':'seismic'}
 
@@ -144,6 +159,7 @@ for v in variables:
         else:
             ax.set_yticklabels([])
         ax.set_xticks([0,6,12,18,24])
+        ax.set_xticklabels(['0000','0600','1200','1800','2400'])
         if ctr>=3:
             plt.xlabel('Hour (UTC)')
         else:
@@ -165,4 +181,5 @@ plt.ylim([0,200])
 plt.plot([0,24],[H-D/2,H-D/2],'--k')
 plt.plot([0,24],[H+D/2,H+D/2],'--k')
 plt.xticks([0,6,12,18,24])
+ax.set_xticklabels(['0000','0600','1200','1800','2400'])
 plt.grid()
