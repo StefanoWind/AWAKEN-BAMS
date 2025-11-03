@@ -12,6 +12,7 @@ import matplotlib as mpl
 import yaml
 import re
 import glob
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -111,7 +112,7 @@ for s in Data_all.keys():
         sin=np.sin(np.radians(Data['WNAC.Dir_10m_Avg'])).interp(time=Data_all[s].time_avg)
         Data_all[s]['yaw']=(np.degrees(np.arctan2(sin,cos)).where(np.abs(time_diff)<max_time_diff)%360).drop_vars("time")
     
-os.makedirs(os.path.join(cd,'figures/rhi_video'),exist_ok=True)
+os.makedirs(os.path.join(cd,f'figures/rhi_video/{sdate.replace("T",".").replace("-","").replace(":","")}-{edate.replace("T",".").replace("-","").replace(":","")}'),exist_ok=True)
 for t1,t2 in zip(time_bins[:-1],time_bins[1:]):
     found=0
     for s in Data_all.keys():
@@ -132,8 +133,11 @@ for t1,t2 in zip(time_bins[:-1],time_bins[1:]):
             dep=1/(Data_sel.x/(Data_sel.x**2+Data_sel.z**2)**0.5)
             dep=dep.where(np.abs(dep)<max_dep)
             u=(Data_sel.wind_speed*dep).values.ravel()
-            
-            sc1=ax1.scatter(y+y_T[s],z+H,s=4,c=u,cmap='coolwarm',vmin=0,vmax=20)
+            if found==1:
+                umin=np.nanpercentile(u,5)
+                umax=np.nanpercentile(u,95)
+                
+            sc1=ax1.scatter(y+y_T[s],z+H,s=4,c=u,cmap='coolwarm',vmin=umin,vmax=umax)
             ax1.plot(y_T[s],H,'.k',markersize=20)
             ax1.set_xlim([-2000+y_T['rt1'],8000+y_T['rt1']])
             ax1.set_ylim([0,2000])
@@ -142,7 +146,7 @@ for t1,t2 in zip(time_bins[:-1],time_bins[1:]):
             ax1.set_ylabel('$z$ [m a.g.l.]')
             ax1.grid(True)
             
-            sc2=ax2.scatter(x+x_T[s],y+y_T[s],z+H,s=2,c=u,cmap='coolwarm',vmin=0,vmax=20)
+            sc2=ax2.scatter(x+x_T[s],y+y_T[s],z+H,s=2,c=u,cmap='coolwarm',vmin=umin,vmax=umax)
             ax2.quiver(x_T[s],y_T[s], 0, np.cos(np.radians(270-Data_sel.yaw))*500, np.sin(np.radians(270-Data_sel.yaw))*500, 0, color='k', arrow_length_ratio=0.25)
             ax2.set_xlim([-2000+x_T['rt1'],2000+x_T['rt1']])
             ax2.set_ylim([-2000+y_T['rt1'],8000+y_T['rt1']])
@@ -158,15 +162,17 @@ for t1,t2 in zip(time_bins[:-1],time_bins[1:]):
            
     if found>0:
         ax1.set_title(str(t1+(t2-t1)/2).replace('T',' ')[:-10])
-            
-        plt.colorbar(sc1,label=r'Deprojected wind speed [m s$^{-1}$]')
+        divider = make_axes_locatable(ax1)
+        cax = divider.append_axes("right", size="3%", pad=0.05)  
+        plt.colorbar(sc1,cax=cax,label=r'Deprojected wind speed [m s$^{-1}$]')
         plt.subplots_adjust(top=0.95,
                         bottom=0.05,
                         left=0.05,
                         right=0.95,
                         hspace=0.0,
                         wspace=0.0)
-        plt.savefig(os.path.join(cd,'figures/rhi_video',f'{str(t1)[:-10].replace("T",".").replace("-","").replace(":","")}.png'))
+        plt.savefig(os.path.join(cd,f'figures/rhi_video/{sdate.replace("T",".").replace("-","").replace(":","")}-{edate.replace("T",".").replace("-","").replace(":","")}',
+                                 f'{str(t1)[:-10].replace("T",".").replace("-","").replace(":","")}.png'))
             
         plt.close()
         print(t1)
