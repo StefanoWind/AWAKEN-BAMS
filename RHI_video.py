@@ -98,7 +98,7 @@ time_bins=np.arange(time_avg_all.min()-np.timedelta64(scan_duration,'s')/2,time_
 
 #load scada
 yaw={}
-for s in config['source_scada']:
+for s in Data_all.keys():
     files=glob.glob(config['source_scada'][s])
     if len(files)>0:
         Data=xr.open_mfdataset(files).rename({'WTUR.DateTime':'time'})
