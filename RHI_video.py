@@ -29,6 +29,8 @@ if len(sys.argv)==1:
     edate='2023-12-05T05:00:00'
 else:
     source_config=sys.argv[1]
+    sdate=sys.argv[2]
+    edate=sys.argv[3]
     
 #fixed inputs
 file_duration=600#[s] scan file duration
