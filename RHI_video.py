@@ -117,12 +117,14 @@ os.makedirs(os.path.join(cd,f'figures/rhi_video/{sdate.replace("T",".").replace(
 umin=[]
 umax=[]
 for s in config['source_rhi']:
-    umin=np.append(umin,np.nanpercentile(np.abs(Data_all[s].wind_speed),5))
-    umax=np.append(umax,np.nanpercentile(np.abs(Data_all[s].wind_speed),95))
-    
-umin=np.floor(np.nanmin(umin))
-umax=np.floor(np.nanmin(umax))
+    if s in Data_all.keys():
+        umin=np.append(umin,np.nanpercentile(np.abs(Data_all[s].wind_speed),5))
+        umax=np.append(umax,np.nanpercentile(np.abs(Data_all[s].wind_speed),95))
 
+if len(umin)>0:
+    umin=np.floor(np.nanmin(umin))
+    umax=np.floor(np.nanmin(umax))
+        
 for t1,t2 in zip(time_bins[:-1],time_bins[1:]):
     found=0
     for s in Data_all.keys():
