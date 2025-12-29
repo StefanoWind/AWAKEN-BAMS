@@ -35,7 +35,7 @@ else:
     
 #fixed inputs
 file_duration=600#[s] scan file duration
-scan_duration=20#[s] scan duration
+scan_duration=30#[s] scan duration
 max_time_diff=600#[s] maximum time difference lidar - scada
 max_dep=3#max deprojection factor
 H=90#[m] hub height
@@ -113,6 +113,16 @@ for s in Data_all.keys():
         Data_all[s]['yaw']=(np.degrees(np.arctan2(sin,cos)).where(np.abs(time_diff)<max_time_diff)%360).drop_vars("time")
     
 os.makedirs(os.path.join(cd,f'figures/rhi_video/{sdate.replace("T",".").replace("-","").replace(":","")}-{edate.replace("T",".").replace("-","").replace(":","")}'),exist_ok=True)
+
+umin=[]
+umax=[]
+for s in config['source_rhi']:
+    umin=np.append(umin,np.nanpercentile(np.abs(Data_all[s].wind_speed),5))
+    umax=np.append(umax,np.nanpercentile(np.abs(Data_all[s].wind_speed),95))
+    
+umin=np.floor(np.nanmin(umin))
+umax=np.floor(np.nanmin(umax))
+
 for t1,t2 in zip(time_bins[:-1],time_bins[1:]):
     found=0
     for s in Data_all.keys():
@@ -124,7 +134,11 @@ for t1,t2 in zip(time_bins[:-1],time_bins[1:]):
             if found==1:
                 fig=plt.figure(figsize=(18,18))
                 ax1=fig.add_subplot(2,1,1)
+                ax1.set_facecolor((0.8,0.8,0.8))
                 ax2=fig.add_subplot(2,1,2,projection='3d')
+                ax2.xaxis.set_pane_color((0.8,0.8,0.8))
+                ax2.yaxis.set_pane_color((0.8,0.8,0.8))
+                ax2.zaxis.set_pane_color((0.8,0.8,0.8))
                 
             Data_sel=Data_all[s].isel(time_avg=sel)
             x=(Data_sel.x*np.cos(np.radians(270-Data_sel.yaw))-Data_sel.y*np.sin(np.radians(270-Data_sel.yaw))).values.ravel()
@@ -133,11 +147,11 @@ for t1,t2 in zip(time_bins[:-1],time_bins[1:]):
             dep=1/(Data_sel.x/(Data_sel.x**2+Data_sel.z**2)**0.5)
             dep=dep.where(np.abs(dep)<max_dep)
             u=(Data_sel.wind_speed*dep).values.ravel()
-            if found==1:
-                umin=np.nanpercentile(u,5)
-                umax=np.nanpercentile(u,95)
+            # if found==1:
+            #     umin=np.nanpercentile(u,5)
+            #     umax=np.nanpercentile(u,95)
                 
-            sc1=ax1.scatter(y+y_T[s],z+H,s=4,c=u,cmap='coolwarm',vmin=umin,vmax=umax)
+            sc1=ax1.scatter(y+y_T[s],z+H,s=4,c=u,cmap='gist_stern',vmin=umin,vmax=umax)
             ax1.plot(y_T[s],H,'.k',markersize=20)
             ax1.set_xlim([-2000+y_T['rt1'],8000+y_T['rt1']])
             ax1.set_ylim([0,2000])
@@ -146,7 +160,7 @@ for t1,t2 in zip(time_bins[:-1],time_bins[1:]):
             ax1.set_ylabel('$z$ [m a.g.l.]')
             ax1.grid(True)
             
-            sc2=ax2.scatter(x+x_T[s],y+y_T[s],z+H,s=2,c=u,cmap='coolwarm',vmin=umin,vmax=umax)
+            sc2=ax2.scatter(x+x_T[s],y+y_T[s],z+H,s=2,c=u,cmap='gist_stern',vmin=umin,vmax=umax)
             ax2.quiver(x_T[s],y_T[s], 0, np.cos(np.radians(270-Data_sel.yaw))*500, np.sin(np.radians(270-Data_sel.yaw))*500, 0, color='k', arrow_length_ratio=0.25)
             ax2.set_xlim([-2000+x_T['rt1'],2000+x_T['rt1']])
             ax2.set_ylim([-2000+y_T['rt1'],8000+y_T['rt1']])
