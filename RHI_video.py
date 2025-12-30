@@ -26,8 +26,8 @@ plt.close('all')
 #%% Inputs
 if len(sys.argv)==1:
     source_config=os.path.join(cd,'configs/config.yaml')
-    sdate='2023-12-05T02:00:00'
-    edate='2023-12-05T05:00:00'
+    sdate='2024-12-05T02:00:00'
+    edate='2024-12-05T05:00:00'
 else:
     source_config=sys.argv[1]
     sdate=sys.argv[2]
