@@ -122,8 +122,8 @@ for s in config['source_rhi']:
         umax=np.append(umax,np.nanpercentile(np.abs(Data_all[s].wind_speed),95))
 
 if len(umin)>0:
-    umin=np.floor(np.nanmin(umin))
-    umax=np.floor(np.nanmin(umax))
+    umin=np.max([np.floor(np.nanmin(umin))-2,0])
+    umax=np.floor(np.nanmin(umax))+2
         
 for t1,t2 in zip(time_bins[:-1],time_bins[1:]):
     found=0
@@ -149,11 +149,8 @@ for t1,t2 in zip(time_bins[:-1],time_bins[1:]):
             dep=1/(Data_sel.x/(Data_sel.x**2+Data_sel.z**2)**0.5)
             dep=dep.where(np.abs(dep)<max_dep)
             u=(Data_sel.wind_speed*dep).values.ravel()
-            # if found==1:
-            #     umin=np.nanpercentile(u,5)
-            #     umax=np.nanpercentile(u,95)
                 
-            sc1=ax1.scatter(y+y_T[s],z+H,s=4,c=u,cmap='gist_stern',vmin=umin,vmax=umax)
+            sc1=ax1.scatter(y+y_T[s],z+H,s=5,c=u,cmap='gist_stern',vmin=umin,vmax=umax)
             ax1.plot(y_T[s],H,'.k',markersize=20)
             ax1.set_xlim([-2000+y_T['rt1'],8000+y_T['rt1']])
             ax1.set_ylim([0,2000])
@@ -163,7 +160,7 @@ for t1,t2 in zip(time_bins[:-1],time_bins[1:]):
             ax1.grid(True)
             
             sc2=ax2.scatter(x+x_T[s],y+y_T[s],z+H,s=2,c=u,cmap='gist_stern',vmin=umin,vmax=umax)
-            ax2.quiver(x_T[s],y_T[s], 0, np.cos(np.radians(270-Data_sel.yaw))*500, np.sin(np.radians(270-Data_sel.yaw))*500, 0, color='k', arrow_length_ratio=0.25)
+            ax2.quiver(x_T[s]+100,y_T[s]-100, 0, np.cos(np.radians(270-Data_sel.yaw))*1000, np.sin(np.radians(270-Data_sel.yaw))*1000, 0, color='g', arrow_length_ratio=0.25)
             ax2.set_xlim([-2000+x_T['rt1'],2000+x_T['rt1']])
             ax2.set_ylim([-2000+y_T['rt1'],8000+y_T['rt1']])
             
